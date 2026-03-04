@@ -1,5 +1,6 @@
 import { Decoder } from "../codecs/decoder";
 import { Encoder } from "../codecs/encoder";
+import { ILoggerFactory } from "../utils/logger/iLoggerFactory";
 
 export abstract class Configuration {
     constructor(
@@ -8,6 +9,7 @@ export abstract class Configuration {
         public productName:string,
         public productUri:string,
         public encoder: Encoder,
-        public decoder: Decoder
+        public decoder: Decoder, 
+        public loggerFactory: ILoggerFactory
     ){}
 }

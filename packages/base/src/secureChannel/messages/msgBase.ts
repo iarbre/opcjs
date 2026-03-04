@@ -1,7 +1,9 @@
 import { BinaryWriter } from "../../codecs/binary/binaryWriter";
 import { IEncryptionAlgorithm } from "../../cryption/iEncryptionAlgorithm";
+import { MsgHeader } from "./msgHeader";
+import { MsgSequenceHeader } from "./msgSequenceHeader";
 
-export class MsgBase {
+export abstract class MsgBase {
     static DecryptAndVerify(
         data: Uint8Array,
         encryptionAlgorithm: IEncryptionAlgorithm,
@@ -65,4 +67,10 @@ export class MsgBase {
             return encryptedData;
         }
     }
+
+    public abstract encode(
+        buffer: BinaryWriter,
+        encryptionAlgorithm: IEncryptionAlgorithm): void;
+
+    constructor(public header: MsgHeader, public sequenceHeader: MsgSequenceHeader, public body: unknown) {}
 }

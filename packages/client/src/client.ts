@@ -1,7 +1,23 @@
-import { NodeId, SecureChannel } from "opcjs-base";
-import { ChannelFactory } from "opcjs-base";
+import {
+  NodeId,
+  TcpConnectionHandler,
+  SecureChannelFacade,
+  SecureChannelContext,
+  SecureChannelMesssageEncoder,
+  SecureChannelTypeDecoder,
+  SecureChannelMessageDecoder,
+  SecureChannelTypeEncoder,
+  initLoggerProvider,
+  TcpMessageInjector,
+  TcpMessageDecoupler,
+  getLogger,
+  WebSocketFascade,
+  WebSocketReadableStream,
+  WebSocketWritableStream,
+  SecureChannelChunkReader,
+  SecureChannelChunkWriter,
+} from "opcjs-base";
 import { SessionHandler } from "./sessions/sessionHandler";
-import { ISecureChannel } from "opcjs-base";
 import { Session } from "./sessions/session";
 import { AttributeService } from "./services/attributeService";
 import { ReadValueResult } from "./readValueResult";
@@ -10,64 +26,119 @@ import { SubscriptionService } from "./services/subscriptionService";
 import { MonitoredItemService } from "./services/monitoredItemService";
 import { UserIdentity } from "./userIdentity";
 import { ConfigurationClient } from "./configurationClient";
+import { ILogger } from "opcjs-base";
 
 export class Client {
+  private endpointUrl: string;
+  private attributeService?: AttributeService;
+  private session?: Session;
+  private subscriptionHandler?: SubscriptionHandler;
+  private logger:ILogger;
 
-    private endpointUrl: string;
-    private channel?: SecureChannel;
-    private session?: Session;
-    private subscriptionHandler?:SubscriptionHandler;
-
-    getSession(): Session{
-        if(!this.session){
-            throw new Error("No session available");
-        }
-        return this.session;
+  getSession(): Session {
+    if (!this.session) {
+      throw new Error("No session available");
     }
+    return this.session;
+  }
 
-    async connect(): Promise<void> {
-        const channel = ChannelFactory.createChannel(this.endpointUrl);
-        let connected = false;
-        while (!connected){
-            console.log(`Connecting to OPC UA server at ${this.endpointUrl}...`);
-            connected = await channel.connect();
-            if(!connected){
-                console.log("Connection failed, retrying in 2 seconds...");
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-        }
-        console.log('Connected to OPC UA server.');
+  async connect(): Promise<void> {
+    
+    const wsOptions = { endpoint:this.endpointUrl }
+    const ws = new WebSocketFascade(wsOptions);
+    const webSocketReadableStream = new WebSocketReadableStream(ws, 1000);
+    const webSocketWritableStream = new WebSocketWritableStream(ws);
 
-        this.channel = new SecureChannel(channel, this.configuration);
-        await this.channel.openSecureChannelRequest();
 
-        const sessionHandler = new SessionHandler(this.channel, this.configuration);
-        this.session = await sessionHandler.createNewSession(this.identity);
-        this.subscriptionHandler = new SubscriptionHandler(
-            new SubscriptionService(this.session.getAuthToken(), this.channel),
-            new MonitoredItemService(this.session.getAuthToken(), this.channel)
-        )
+    const scContext = new SecureChannelContext(this.endpointUrl);
+    const tcpMessageInjector = new TcpMessageInjector();
+    const tcpConnectionHandler = new TcpConnectionHandler(tcpMessageInjector, scContext);
+    const tcpMessageDecoupler = new TcpMessageDecoupler(tcpConnectionHandler.onTcpMessage.bind(tcpConnectionHandler));
+    const scMessageEncoder = new SecureChannelMesssageEncoder(scContext);
+    const scTypeDecoder = new SecureChannelTypeDecoder(
+      this.configuration.decoder,
+    );
+    const scMessageDecoder = new SecureChannelMessageDecoder(scContext);
+    const scTypeEncoder = new SecureChannelTypeEncoder(
+      this.configuration.encoder,
+    );
+    const scChunkWriter = new SecureChannelChunkWriter(scContext);
+    const scChunkReader = new SecureChannelChunkReader(scContext);
+
+    webSocketReadableStream.pipeTo(tcpMessageDecoupler.writable);
+    tcpMessageDecoupler.readable.pipeTo(scMessageDecoder.writable);
+    scMessageDecoder.readable.pipeTo(scChunkReader.writable);
+    scChunkReader.readable.pipeTo(scTypeDecoder.writable);
+
+    scTypeEncoder.readable.pipeTo(scChunkWriter.writable);
+    scChunkWriter.readable.pipeTo(scMessageEncoder.writable);
+    scMessageEncoder.readable.pipeTo(tcpMessageInjector.writable);
+    tcpMessageInjector.readable.pipeTo(webSocketWritableStream);
+
+    const sc = new SecureChannelFacade(scContext, scTypeDecoder, scTypeEncoder);
+
+    // const response = await sc.send(request, wsWritable);
+
+    //const channel = ChannelFactory.createChannel(this.endpointUrl);
+    let connected = false;
+    while (!connected) {
+      this.logger.debug(`Connecting to OPC UA server at ${this.endpointUrl}...`);
+      await ws.connect();
+      this.logger.debug("WebSocket connection established, now establishing TCP connection...");
+      connected = await tcpConnectionHandler.connect(this.endpointUrl);
+
+      if (!connected) {
+        this.logger.info("Connection failed, retrying in 2 seconds...");
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
     }
+    this.logger.info("Connected to OPC UA server.");
 
-    async disconnect(): Promise<void> {
-        console.log('Disconnecting from OPC UA server...');
-        // Implementation of disconnection logic goes here
-        if (this.channel) {
-            await this.channel.disconnect();
-        }
-    }
+    //this.channel = new SecureChannel(channel, this.configuration);
+    this.logger.debug("Opening secure channel...");
+    await sc.openSecureChannel();
+    this.logger.debug("Secure channel established.");
 
-    async read(ids: NodeId[]):Promise<ReadValueResult[]>{
-        const service = new AttributeService(this.getSession().getAuthToken(), this.channel as ISecureChannel);
-        const result = await service.ReadValue(ids);
-        return result.map(r => new ReadValueResult(r.value, r.status))
-    }
+    this.logger.debug("Creating session...");
+    const sessionHandler = new SessionHandler(sc, this.configuration);
+    this.session = await sessionHandler.createNewSession(this.identity);
+    this.logger.debug("Session created.");
+    
+    this.logger.debug("Initializing services...");
+    this.attributeService = new AttributeService(this.session.getAuthToken(), sc);
+    this.subscriptionHandler = new SubscriptionHandler(
+      new SubscriptionService(this.session.getAuthToken(), sc),
+      new MonitoredItemService(this.session.getAuthToken(), sc),
+    );
+  }
 
-    async subscribe(ids: NodeId[], callback: (data: {id:NodeId, value:unknown}[]) => void){
-        this.subscriptionHandler?.subscribe(ids, callback)
-    }
+  async disconnect(): Promise<void> {
+    this.logger.info("Disconnecting from OPC UA server...");
+    // Implementation of disconnection logic goes here
+    // if (this.channel) {
+    //   await this.channel.disconnect();
+    // }
+  }
 
-    constructor(endpointUrl: string, private configuration: ConfigurationClient, private identity: UserIdentity) {
-        this.endpointUrl = endpointUrl;
-    }
+  async read(ids: NodeId[]): Promise<ReadValueResult[]> {
+    const result = await this.attributeService?.ReadValue(ids);
+    return result?.map((r) => new ReadValueResult(r.value, r.status)) || [];
+  }
+
+  async subscribe(
+    ids: NodeId[],
+    callback: (data: { id: NodeId; value: unknown }[]) => void,
+  ) {
+    this.subscriptionHandler?.subscribe(ids, callback);
+  }
+
+  constructor(
+    endpointUrl: string,
+    private configuration: ConfigurationClient,
+    private identity: UserIdentity,
+  ) {
+    this.endpointUrl = endpointUrl;
+    initLoggerProvider(configuration.loggerFactory);
+    this.logger = getLogger("Client");
+  }
 }

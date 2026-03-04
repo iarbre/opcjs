@@ -5,17 +5,9 @@ import { IEncryptionAlgorithm } from "../../cryption/iEncryptionAlgorithm";
 import { MsgBase } from "./msgBase";
 import { BinaryReader } from "../../codecs/binary/binaryReader";
 import { BinaryWriter } from "../../codecs/binary/binaryWriter";
-import { Decoder } from "../../codecs/decoder";
 
 // https://reference.opcfoundation.org/Core/Part6/v105/docs/6.7.2
 export class MsgSymmetric extends MsgBase {
-    constructor(
-        public header: MsgHeader,
-        public securityHeader: MsgSecurityHeaderSymmetric,
-        public sequenceHeader: MsgSequenceHeader,
-        public body: unknown) {
-        super();
-    }
 
     static decode(
         buffer: BinaryReader,
@@ -39,7 +31,7 @@ export class MsgSymmetric extends MsgBase {
         return new MsgSymmetric(header, securityHeader, sequenceHeader, body);
     }
 
-    encode(
+    public override encode(
         buffer: BinaryWriter,
         encryptionAlgorithm: IEncryptionAlgorithm) {
 
@@ -54,5 +46,13 @@ export class MsgSymmetric extends MsgBase {
         buffer.writeBytesAt(encryptedBody, headerLength);
 
         // the size was written by encrypt
+    }
+
+    constructor(
+        header: MsgHeader, // todo: move to base class
+        public securityHeader: MsgSecurityHeaderSymmetric,
+        sequenceHeader: MsgSequenceHeader,
+        body: unknown) {
+        super(header, sequenceHeader, body);
     }
 }

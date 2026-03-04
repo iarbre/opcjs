@@ -1,0 +1,105 @@
+import { getLogger } from "../../utils/logger/loggerProvider";
+import { WebSocketFascade } from "./webSocketFascade";
+
+// ─── Readable stream ──────────────────────────────────────────────────────────
+export class WebSocketReadableStream extends ReadableStream<Uint8Array> {
+  private readonly ws: WebSocketFascade;
+  private readonly maxBufferedMessages: number;
+  private readonly logger = getLogger("transport.WebSocketReadableStream");
+  private buffer: Uint8Array[] = [];
+  private closed = false;
+  private errored: unknown = null;
+  private notifyPull: (() => void) | null = null;
+
+  private bufferPush(chunk: Uint8Array): void {
+    if (this.buffer.length >= this.maxBufferedMessages) {
+      this.errored = new Error("Inbound buffer overflow");
+      this.cleanup();
+      this.notifyPull?.();
+      return;
+    }
+    this.buffer.push(chunk);
+    this.notifyPull?.();
+  }
+
+  private cleanup(): void {
+    this.ws.close();
+  }
+
+  private sourceOnPull(
+    controller: ReadableStreamDefaultController<Uint8Array>
+  ): void | Promise<void> {
+    this.logger.trace("ReadableStream pull requested, buffer length =", this.buffer.length);
+    if (this.errored) {
+      controller.error(this.errored);
+      this.cleanup();
+      return;
+    }
+
+    const next = this.buffer.shift();
+    if (next) {
+      controller.enqueue(next);
+      return;
+    }
+
+    if (this.closed) {
+      controller.close();
+      this.cleanup();
+      return;
+    }
+
+    return new Promise<void>((resolve) => {
+      this.notifyPull = () => {
+        this.notifyPull = null;
+        resolve();
+      };
+    });
+  }
+
+  private sourceOnCancel(reason: unknown): void {
+    this.logger.warn("ReadableStream cancelled:", reason);
+    this.cleanup();
+  }
+
+  private wsOnMessage(event: MessageEvent){
+      const data: unknown = event.data;
+      let chunk: Uint8Array | undefined;
+
+      if (data instanceof ArrayBuffer) {
+        chunk = new Uint8Array(data);
+      } else if (data instanceof Uint8Array) {
+        chunk = data;
+      } else {
+        this.logger.warn("Received non-binary WebSocket message, ignoring");
+      }
+
+      if (chunk) {
+        this.logger.trace("WebSocket received data of size", chunk.byteLength, "bytes");
+        this.bufferPush(chunk);
+      }
+    }
+
+  constructor(ws: WebSocketFascade, maxBufferedMessages: number) {
+    super({
+      pull: (controller) => this.sourceOnPull(controller),
+      cancel: (reason) => this.sourceOnCancel(reason),
+    });
+
+    this.ws = ws;
+    this.maxBufferedMessages = maxBufferedMessages;
+
+    ws.setOnMessage(this.wsOnMessage.bind(this));
+
+    ws.setOnError((e) => {
+      this.errored = e;
+      this.logger.error("WebSocket error observed:", e);
+      this.notifyPull?.();
+    });
+
+    ws.setOnClose(() => {
+      this.closed = true;
+      this.logger.debug("WebSocket connection closed.");
+      this.notifyPull?.();
+    });
+  }
+}

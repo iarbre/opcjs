@@ -1,6 +1,5 @@
 import { BinaryReader } from "../../codecs/binary/binaryReader";
 import { BinaryWriter } from "../../codecs/binary/binaryWriter";
-import { Decoder } from "../../codecs/decoder";
 import { IEncryptionAlgorithm } from "../../cryption/iEncryptionAlgorithm";
 import { MsgBase } from "./msgBase";
 import { MsgHeader } from "./msgHeader";
@@ -10,11 +9,11 @@ import { MsgSequenceHeader } from "./msgSequenceHeader";
 // https://reference.opcfoundation.org/Core/Part6/v105/docs/6.7.2
 export class MsgAsymmetric extends MsgBase {
     constructor(
-        public header: MsgHeader,
+        header: MsgHeader,
         public securityHeader: MsgSecurityHeaderAsymmetric,
-        public sequenceHeader: MsgSequenceHeader,
-        public body: unknown) {
-        super();
+        sequenceHeader: MsgSequenceHeader,
+        body: unknown) {
+        super(header, sequenceHeader, body);
     }
 
     static decode(
@@ -39,7 +38,7 @@ export class MsgAsymmetric extends MsgBase {
         );
     }
 
-    encode(
+    public override encode(
         buffer: BinaryWriter,
         encryptionAlgorithm: IEncryptionAlgorithm) {
 

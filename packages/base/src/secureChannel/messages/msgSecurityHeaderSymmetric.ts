@@ -3,7 +3,7 @@ import { BinaryWriter } from "../../codecs/binary/binaryWriter";
 
 // https://reference.opcfoundation.org/Core/Part6/v105/docs/6.7.2.3
 export class MsgSecurityHeaderSymmetric {
-    constructor(public tokenId: number) { }
+    public static Size = 4;
 
     static decode(buffer: BinaryReader): MsgSecurityHeaderSymmetric {
         const tokenId = buffer.readUInt32();
@@ -13,4 +13,5 @@ export class MsgSecurityHeaderSymmetric {
     encode(buffer: BinaryWriter) {
         buffer.writeUInt32(this.tokenId);
     }
+    constructor(public tokenId: number) { }
 }

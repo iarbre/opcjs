@@ -1,13 +1,15 @@
 import {
     ActivateSessionRequest, ApplicationDescription, ApplicationTypeEnum,
     Configuration, CreateSessionRequest, CreateSessionResponse, EndpointDescription, ExtensionObject,
+    getLogger,
     ISecureChannel, LocalizedText, NodeId, SignatureData, SignedSoftwareCertificate, UserIdentityToken
 } from "opcjs-base";
 import { ServiceBase } from "./serviceBase";
 
 export class SessionService extends ServiceBase {
+    private logger = getLogger("services.SessionService");
     async createSession(): Promise<{ sessionId: number, authToken: NodeId, endpoint: EndpointDescription }> {
-        console.log("Creating session...");
+        this.logger.debug("Creating session...");
 
         const clientDescription = new ApplicationDescription();
         clientDescription.applicationUri = this.configuration.applicationUri;
@@ -33,7 +35,7 @@ export class SessionService extends ServiceBase {
         // todo: verify endpoints
         // todo: check application uri in server certificate
 
-        console.log("Sending CreateSessionRequest...");
+        this.logger.debug("Sending CreateSessionRequest...");
         const response = await this.secureChannel.issueServiceRequest(request);
         if (!response || !(response instanceof CreateSessionResponse)) {
             throw new Error("Invalid response type for CreateSessionRequest");
@@ -64,7 +66,7 @@ export class SessionService extends ServiceBase {
             throw new Error(`Server endpoint ${endpoint} not found in CreateSessionResponse`);
         }
 
-        console.log("Session created with id:", castedResponse.sessionId.identifier);
+        this.logger.debug("Session created with id:", castedResponse.sessionId.identifier);
         return {
             sessionId: castedResponse.sessionId.identifier as number,
             authToken: castedResponse.authenticationToken,
@@ -85,9 +87,9 @@ export class SessionService extends ServiceBase {
         request.userIdentityToken = ExtensionObject.newBinary(identityToken);
         request.userTokenSignature = signatureData;
 
-        console.log("Sending ActivateSessionRequest...");
+        this.logger.debug("Sending ActivateSessionRequest...");
         await this.secureChannel.issueServiceRequest(request);
-        console.log("Session activated.");
+        this.logger.debug("Session activated.");
     }
 
     recreate(authToken: NodeId): SessionService {

@@ -1,11 +1,11 @@
 
 import { IWriter } from "../../codecs/interfaces/iWriter";
+import { MsgBase } from "./msgBase";
 import { MsgHeader } from "./msgHeader";
 import { MsgTypeHello } from "./msgTypes";
 
 // https://reference.opcfoundation.org/Core/Part6/v105/docs/7.1.2.3
-export class MsgHello {
-    private header: MsgHeader = new MsgHeader(MsgTypeHello, 0);
+export class MsgHello extends MsgBase{
 
     constructor(
         public ProtocolVersion: number,
@@ -14,6 +14,7 @@ export class MsgHello {
         public MaxMessageSize: number,
         public MaxChunkCount: number,
         public EndpointUrl: string) {
+            super(new MsgHeader(MsgTypeHello, 0));
     }
 
     encode(buffer: IWriter) {

@@ -25,6 +25,8 @@ process.on('SIGINT', shutdown);  // Ctrl+C
 process.on('SIGTERM', shutdown); // Kill command
 
 async function main(): Promise<void> {
+
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   console.log('Creating OPC UA Client...');
 
   const configuration = ConfigurationClient.getSimple('MyNodeOPCUAClient', 'eos');
