@@ -8,6 +8,8 @@
  * @see OPC UA Part 6, Section 5.1.1
  */
 
+import { BuiltInType } from "./builtinType";
+
 export function StatusCodeToString(statusCode?: number): string {
   if (statusCode === undefined) {
     return 'Unknown';
@@ -17,8 +19,8 @@ export function StatusCodeToString(statusCode?: number): string {
   return name ?? `0x${statusCode.toString(16).toUpperCase().padStart(8, '0')}`;
 }
 
-export type UaStatusCode = {value: StatusCode; readonly type: 'statuscode' };
-export const uaStatusCode = (value: StatusCode): UaStatusCode => ({ value, type: 'statuscode' });
+export type UaStatusCode = {value: StatusCode; readonly type: BuiltInType.StatusCode };
+export const uaStatusCode = (value: StatusCode): UaStatusCode => ({ value, type: BuiltInType.StatusCode });
 
 export enum StatusCode {
   Good = 0x0 as number,

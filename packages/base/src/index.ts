@@ -20,7 +20,7 @@ export { ExtensionObject } from './types/extensionObject.js';
 export { LocalizedText } from './types/localizedText.js';
 export { NodeIdType, NodeId } from './types/nodeId.js';
 export { QualifiedName } from './types/qualifiedName.js';
-export { VariantType, Variant } from './types/variant.js';
+export { Variant } from './types/variant.js';
 export type { VariantValue, VariantArrayValue } from './types/variant.js';
 export { XmlElement } from './types/xmlElement.js';
 export type { UaBoolean, UaSbyte, UaByte, UaInt16, UaUint16, UaInt32, UaUint32, UaInt64, UaUint64, UaFloat, UaDouble, UaString, UaDateTime, UaGuid, UaByteString, UaPrimitive } from './types/primitives.js';

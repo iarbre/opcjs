@@ -12,11 +12,12 @@ import { LocalizedText } from '../../types/localizedText.js';
 import { ExtensionObject } from '../../types/extensionObject.js';
 import { ExtensionObjectEncoding } from '../../types/extensionObjectEncoding.js';
 import { DataValue } from '../../types/dataValue.js';
-import { Variant, VariantType } from '../../types/variant.js';
+import { Variant } from '../../types/variant.js';
 import { DiagnosticInfo } from '../../types/diagnosticInfo.js';
 import { IWriter } from '../interfaces/iWriter.js';
 import { Encoder } from '../encoder.js';
 import { XmlElement } from '../../types/xmlElement.js';
+import { BuiltInType } from '../../types/builtinType.js';
 
 /**
  * OPC UA DateTime epoch: January 1, 1601 00:00:00 UTC
@@ -576,11 +577,11 @@ export class BinaryWriter implements IWriter {
    * @see OPC 10000-6 Section 5.2.2.16
    */
   writeVariant(value: Variant, encoder: Encoder): void {
-    if (value.variantType < 0 || value.variantType > 25) {
-      throw new CodecError(`Invalid Variant type ID: ${value.variantType}. Must be 0-25.`);
+    if (value.type < 0 || value.type > 25) {
+      throw new CodecError(`Invalid Variant type ID: ${value.type}. Must be 0-25.`);
     }
 
-    let mask = value.variantType & VariantMask.TypeMask;
+    let mask = value.type & VariantMask.TypeMask;
     const isArrayValue = Array.isArray(value.value);
 
     if (isArrayValue) {
@@ -596,10 +597,10 @@ export class BinaryWriter implements IWriter {
       const array = value.value as unknown[];
       this.writeInt32(array.length);
       for (const elem of array) {
-        this.writeVariantValue(value.variantType, elem, encoder);
+        this.writeVariantValue(value.type, elem, encoder);
       }
-    } else if (value.variantType !== VariantType.Null) {
-      this.writeVariantValue(value.variantType, value.value, encoder);
+    } else if (value.type !== BuiltInType.Null) {
+      this.writeVariantValue(value.type, value.value, encoder);
     }
 
     if (value.arrayDimensions !== undefined && value.arrayDimensions.length > 0) {
@@ -638,34 +639,34 @@ export class BinaryWriter implements IWriter {
 
   // === Private helpers ===
 
-  private writeVariantValue(type: VariantType, value: unknown, encoder: Encoder): void {
+  private writeVariantValue(type: BuiltInType, value: unknown, encoder: Encoder): void {
     switch (type) {
-      case VariantType.Null: break;
-      case VariantType.Boolean: this.writeBoolean(value as boolean); break;
-      case VariantType.SByte: this.writeSByte(value as number); break;
-      case VariantType.Byte: this.writeByte(value as number); break;
-      case VariantType.Int16: this.writeInt16(value as number); break;
-      case VariantType.UInt16: this.writeUInt16(value as number); break;
-      case VariantType.Int32: this.writeInt32(value as number); break;
-      case VariantType.UInt32: this.writeUInt32(value as number); break;
-      case VariantType.Int64: this.writeInt64(value as bigint); break;
-      case VariantType.UInt64: this.writeUInt64(value as bigint); break;
-      case VariantType.Float: this.writeFloat(value as number); break;
-      case VariantType.Double: this.writeDouble(value as number); break;
-      case VariantType.String: this.writeString(value as string); break;
-      case VariantType.DateTime: this.writeDateTime(value as Date); break;
-      case VariantType.Guid: this.writeGuid(value as string); break;
-      case VariantType.ByteString: this.writeByteString(value as Uint8Array); break;
-      case VariantType.XmlElement: this.writeXmlElement(value as string); break;
-      case VariantType.NodeId: this.writeNodeId(value as NodeId); break;
-      case VariantType.ExpandedNodeId: this.writeExpandedNodeId(value as ExpandedNodeId); break;
-      case VariantType.StatusCode: this.writeStatusCode(value as StatusCode); break;
-      case VariantType.QualifiedName: this.writeQualifiedName(value as QualifiedName); break;
-      case VariantType.LocalizedText: this.writeLocalizedText(value as LocalizedText); break;
-      case VariantType.ExtensionObject: this.writeExtensionObject(value as ExtensionObject, encoder); break;
-      case VariantType.DataValue: this.writeDataValue(value as DataValue, encoder); break;
-      case VariantType.Variant: this.writeVariant(value as Variant, encoder); break;
-      case VariantType.DiagnosticInfo: this.writeDiagnosticInfo(value as DiagnosticInfo); break;
+      case BuiltInType.Null: break;
+      case BuiltInType.Boolean: this.writeBoolean(value as boolean); break;
+      case BuiltInType.SByte: this.writeSByte(value as number); break;
+      case BuiltInType.Byte: this.writeByte(value as number); break;
+      case BuiltInType.Int16: this.writeInt16(value as number); break;
+      case BuiltInType.UInt16: this.writeUInt16(value as number); break;
+      case BuiltInType.Int32: this.writeInt32(value as number); break;
+      case BuiltInType.UInt32: this.writeUInt32(value as number); break;
+      case BuiltInType.Int64: this.writeInt64(value as bigint); break;
+      case BuiltInType.UInt64: this.writeUInt64(value as bigint); break;
+      case BuiltInType.Float: this.writeFloat(value as number); break;
+      case BuiltInType.Double: this.writeDouble(value as number); break;
+      case BuiltInType.String: this.writeString(value as string); break;
+      case BuiltInType.DateTime: this.writeDateTime(value as Date); break;
+      case BuiltInType.Guid: this.writeGuid(value as string); break;
+      case BuiltInType.ByteString: this.writeByteString(value as Uint8Array); break;
+      case BuiltInType.XmlElement: this.writeXmlElement(value as string); break;
+      case BuiltInType.NodeId: this.writeNodeId(value as NodeId); break;
+      case BuiltInType.ExpandedNodeId: this.writeExpandedNodeId(value as ExpandedNodeId); break;
+      case BuiltInType.StatusCode: this.writeStatusCode(value as StatusCode); break;
+      case BuiltInType.QualifiedName: this.writeQualifiedName(value as QualifiedName); break;
+      case BuiltInType.LocalizedText: this.writeLocalizedText(value as LocalizedText); break;
+      case BuiltInType.ExtensionObject: this.writeExtensionObject(value as ExtensionObject, encoder); break;
+      case BuiltInType.DataValue: this.writeDataValue(value as DataValue, encoder); break;
+      case BuiltInType.Variant: this.writeVariant(value as Variant, encoder); break;
+      case BuiltInType.DiagnosticInfo: this.writeDiagnosticInfo(value as DiagnosticInfo); break;
       default: throw new CodecError(`Unsupported Variant type: ${type}`);
     }
   }

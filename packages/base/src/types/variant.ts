@@ -16,39 +16,8 @@ import type { ExtensionObject } from './extensionObject.js';
 import type { DataValue } from './dataValue.js';
 import type { DiagnosticInfo } from './diagnosticInfo.js';
 import { StatusCode } from './statusCode.js';
-import type { UaPrimitive} from './primitives.js';
-
-/**
- * Enumeration of variant types based on BuiltinType NodeIds.
- */
-export enum VariantType {
-  Null = 0,
-  Boolean = 1,
-  SByte = 2,
-  Byte = 3,
-  Int16 = 4,
-  UInt16 = 5,
-  Int32 = 6,
-  UInt32 = 7,
-  Int64 = 8,
-  UInt64 = 9,
-  Float = 10,
-  Double = 11,
-  String = 12,
-  DateTime = 13,
-  Guid = 14,
-  ByteString = 15,
-  XmlElement = 16,
-  NodeId = 17,
-  ExpandedNodeId = 18,
-  StatusCode = 19,
-  QualifiedName = 20,
-  LocalizedText = 21,
-  ExtensionObject = 22,
-  DataValue = 23,
-  Variant = 24,
-  DiagnosticInfo = 25,
-}
+import type { UaPrimitive } from './primitives.js';
+import { BuiltInType } from './builtinType.js';
 
 /**
  * Type union representing all possible variant values.
@@ -102,7 +71,7 @@ export class Variant {
   /**
    * The variant type identifier.
    */
-  public readonly variantType: VariantType;
+  public readonly type: BuiltInType;
 
   /**
    * The variant value (scalar or array).
@@ -117,38 +86,12 @@ export class Variant {
   public readonly arrayDimensions: number[] | undefined;
 
   /**
-   * Creates a new Variant.
-   * 
-   * @param variantType - The type of value stored in the variant
-   * @param value - The scalar or array value
-   * @param arrayDimensions - Optional array dimensions for structured arrays
-   */
-  constructor(
-    variantType: VariantType = VariantType.Null,
-    value: VariantValue | VariantArrayValue = undefined,
-    arrayDimensions: number[] | undefined = undefined
-  ) {
-    this.variantType = variantType;
-    this.value = value;
-    this.arrayDimensions = arrayDimensions;
-  }
-
-  /**
-   * Creates a undefined variant.
-   * 
-   * @returns A new Variant with undefined value
-   */
-  public static createNull(): Variant {
-    return new Variant(VariantType.Null);
-  }
-
-  /**
    * Checks if this variant is null.
    * 
    * @returns True if the variant type is Null
    */
   public isNull(): boolean {
-    return this.variantType === VariantType.Null;
+    return this.type === BuiltInType.Null;
   }
 
   /**
@@ -188,7 +131,7 @@ export class Variant {
    * @returns True if variants are equal
    */
   public equals(other: Variant): boolean {
-    if (this.variantType !== other.variantType) {
+    if (this.type !== other.type) {
       return false;
     }
 
@@ -213,23 +156,26 @@ export class Variant {
   }
 
   /**
-   * Lookup table mapping UA primitive type discriminants to VariantType enum values.
+   * Converts the variant to a string representation.
+   * 
+   * @returns A string representation of the variant
    */
-  private static readonly primitiveTagMap = {
-    sbyte:  VariantType.SByte,
-    byte:   VariantType.Byte,
-    int16:  VariantType.Int16,
-    uint16: VariantType.UInt16,
-    int32:  VariantType.Int32,
-    uint32: VariantType.UInt32,
-    int64:  VariantType.Int64,
-    uint64: VariantType.UInt64,
-    float:  VariantType.Float,
-    double: VariantType.Double,
-    string: VariantType.String,
-    guid:   VariantType.Guid,
-    bytestring: VariantType.ByteString,
-  } as const satisfies Record<string, VariantType>;
+  public toString(): string {
+    const typeName = BuiltInType[this.type];
+
+    if (this.isNull()) {
+      return 'Variant(Null)';
+    }
+
+    if (this.isArray()) {
+      const dimStr = this.arrayDimensions
+        ? `[${this.arrayDimensions.join(',')}]`
+        : '[?]';
+      return `Variant(${typeName}${dimStr})`;
+    }
+
+    return `Variant(${typeName}: ${String(this.value)})`;
+  }
 
   /**
    * Creates a Variant from a typed OPC UA primitive value.
@@ -237,53 +183,32 @@ export class Variant {
    * Uses the `.type` discriminant on tagged primitives to determine the
    * VariantType exactly — no heuristic inference based on value ranges.
    *
-   * | Input type       | VariantType  |
-   * |------------------|--------------|
-   * | `UaBoolean`      | Boolean      |
-   * | `UaSbyte`        | SByte        |
-   * | `UaByte`         | Byte         |
-   * | `UaInt16`        | Int16        |
-   * | `UaUint16`       | UInt16       |
-   * | `UaInt32`        | Int32        |
-   * | `UaUint32`       | UInt32       |
-   * | `UaInt64`        | Int64        |
-   * | `UaUint64`       | UInt64       |
-   * | `UaFloat`        | Float        |
-   * | `UaDouble`       | Double       |
-   * | `UaString`       | String       |
-   * | `UaDateTime`     | DateTime     |
-   * | `UaGuid`         | Guid         |
-   * | `UaByteString`   | ByteString   |
-   *
    * @param value - A typed OPC UA primitive value.
    * @returns A new Variant wrapping the inner value with the correct VariantType.
    */
   public static newFrom<T extends UaPrimitive>(value: T): Variant {
     if (value === null || value === undefined) {
-      return Variant.createNull();
+      return Variant.newNull();
     }
     // UaBoolean = boolean
     if (typeof value === 'boolean') {
-      return new Variant(VariantType.Boolean, value);
+      return new Variant(BuiltInType.Boolean, value);
     }
-    if (typeof value === 'string'){
-      return new Variant(VariantType.String, value);
+    if (typeof value === 'string') {
+      return new Variant(BuiltInType.String, value);
     }
-    if (value instanceof Uint8Array){
-      return new Variant(VariantType.ByteString, value);
+    if (value instanceof Uint8Array) {
+      return new Variant(BuiltInType.ByteString, value);
     }
     // UaDateTime = Date
     if (value instanceof Date) {
-      return new Variant(VariantType.DateTime, value);
+      return new Variant(BuiltInType.DateTime, value);
     }
     // Tagged union types: UaSbyte | UaByte | UaInt16 | UaUint16 | UaInt32 | UaUint32
-    //                   | UaInt64 | UaUint64 | UaFloat | UaDouble | UaString | UaGuid
+    //                   | UaInt64 | UaUint64 | UaFloat | UaDouble | UaGuid
     if (typeof value === 'object' && 'type' in value) {
-      const tagged = value as { type: keyof typeof Variant.primitiveTagMap; value: VariantValue };
-      const variantType = Variant.primitiveTagMap[tagged.type];
-      if (variantType !== undefined) {
-        return new Variant(variantType, tagged.value);
-      }
+      const tagged = value as { type: BuiltInType; value: VariantValue };
+      return new Variant(tagged.type, tagged.value);
     }
     throw new Error(
       `newFrom: unhandled UaPrimitive value: ${JSON.stringify(value)}`
@@ -291,24 +216,28 @@ export class Variant {
   }
 
   /**
-   * Converts the variant to a string representation.
+   * Creates a undefined variant.
    * 
-   * @returns A string representation of the variant
+   * @returns A new Variant with undefined value
    */
-  public toString(): string {
-    const typeName = VariantType[this.variantType];
-    
-    if (this.isNull()) {
-      return 'Variant(Null)';
-    }
+  public static newNull(): Variant {
+    return new Variant(BuiltInType.Null);
+  }
 
-    if (this.isArray()) {
-      const dimStr = this.arrayDimensions 
-        ? `[${this.arrayDimensions.join(',')}]` 
-        : '[?]';
-      return `Variant(${typeName}${dimStr})`;
-    }
-
-    return `Variant(${typeName}: ${String(this.value)})`;
+  /**
+   * Creates a new Variant.
+   * 
+   * @param variantType - The type of value stored in the variant
+   * @param value - The scalar or array value
+   * @param arrayDimensions - Optional array dimensions for structured arrays
+   */
+  constructor(
+    variantType: BuiltInType = BuiltInType.Null,
+    value: VariantValue | VariantArrayValue = undefined,
+    arrayDimensions: number[] | undefined = undefined
+  ) {
+    this.type = variantType;
+    this.value = value;
+    this.arrayDimensions = arrayDimensions;
   }
 }

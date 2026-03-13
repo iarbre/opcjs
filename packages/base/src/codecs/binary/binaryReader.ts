@@ -12,12 +12,13 @@ import { LocalizedText } from '../../types/localizedText.js';
 import { ExtensionObject } from '../../types/extensionObject.js';
 import { ExtensionObjectEncoding } from '../../types/extensionObjectEncoding.js';
 import { DataValue } from '../../types/dataValue.js';
-import { Variant, VariantArrayValue, VariantType, VariantValue } from '../../types/variant.js';
+import { Variant, VariantArrayValue, VariantValue } from '../../types/variant.js';
 import { DiagnosticInfo } from '../../types/diagnosticInfo.js';
 import type { IReader } from '../interfaces/iReader.js';
 import type { IOpcType } from '../../types/iOpcType.js';
 import { Decoder } from '../decoder.js';
 import { XmlReader } from '../xml/xmlReader.js';
+import { BuiltInType } from '../../types/builtinType.js';
 
 /**
  * OPC UA DateTime epoch: January 1, 1601 00:00:00 UTC
@@ -507,7 +508,7 @@ export class BinaryReader implements IReader {
         array.push(this.readVariantValue(type, decoder));
       }
       value = array as VariantArrayValue;
-    } else if (type === VariantType.Null) {
+    } else if (type === BuiltInType.Null) {
       value = undefined;
     } else {
       value = this.readVariantValue(type, decoder) as VariantValue;
@@ -637,34 +638,34 @@ export class BinaryReader implements IReader {
     }
   }
 
-  private readVariantValue(type: VariantType, decoder: Decoder): unknown {
+  private readVariantValue(type: BuiltInType, decoder: Decoder): unknown {
     switch (type) {
-      case VariantType.Null: return null;
-      case VariantType.Boolean: return this.readBoolean();
-      case VariantType.SByte: return this.readSByte();
-      case VariantType.Byte: return this.readByte();
-      case VariantType.Int16: return this.readInt16();
-      case VariantType.UInt16: return this.readUInt16();
-      case VariantType.Int32: return this.readInt32();
-      case VariantType.UInt32: return this.readUInt32();
-      case VariantType.Int64: return this.readInt64();
-      case VariantType.UInt64: return this.readUInt64();
-      case VariantType.Float: return this.readFloat();
-      case VariantType.Double: return this.readDouble();
-      case VariantType.String: return this.readString();
-      case VariantType.DateTime: return this.readDateTime();
-      case VariantType.Guid: return this.readGuid();
-      case VariantType.ByteString: return this.readByteString();
-      case VariantType.XmlElement: return this.readXmlElement();
-      case VariantType.NodeId: return this.readNodeId();
-      case VariantType.ExpandedNodeId: return this.readExpandedNodeId();
-      case VariantType.StatusCode: return this.readStatusCode();
-      case VariantType.QualifiedName: return this.readQualifiedName();
-      case VariantType.LocalizedText: return this.readLocalizedText();
-      case VariantType.ExtensionObject: return this.readExtensionObject(decoder);
-      case VariantType.DataValue: return this.readDataValue(decoder);
-      case VariantType.Variant: return this.readVariant(decoder);
-      case VariantType.DiagnosticInfo: return this.readDiagnosticInfo();
+      case BuiltInType.Null: return null;
+      case BuiltInType.Boolean: return this.readBoolean();
+      case BuiltInType.SByte: return this.readSByte();
+      case BuiltInType.Byte: return this.readByte();
+      case BuiltInType.Int16: return this.readInt16();
+      case BuiltInType.UInt16: return this.readUInt16();
+      case BuiltInType.Int32: return this.readInt32();
+      case BuiltInType.UInt32: return this.readUInt32();
+      case BuiltInType.Int64: return this.readInt64();
+      case BuiltInType.UInt64: return this.readUInt64();
+      case BuiltInType.Float: return this.readFloat();
+      case BuiltInType.Double: return this.readDouble();
+      case BuiltInType.String: return this.readString();
+      case BuiltInType.DateTime: return this.readDateTime();
+      case BuiltInType.Guid: return this.readGuid();
+      case BuiltInType.ByteString: return this.readByteString();
+      case BuiltInType.XmlElement: return this.readXmlElement();
+      case BuiltInType.NodeId: return this.readNodeId();
+      case BuiltInType.ExpandedNodeId: return this.readExpandedNodeId();
+      case BuiltInType.StatusCode: return this.readStatusCode();
+      case BuiltInType.QualifiedName: return this.readQualifiedName();
+      case BuiltInType.LocalizedText: return this.readLocalizedText();
+      case BuiltInType.ExtensionObject: return this.readExtensionObject(decoder);
+      case BuiltInType.DataValue: return this.readDataValue(decoder);
+      case BuiltInType.Variant: return this.readVariant(decoder);
+      case BuiltInType.DiagnosticInfo: return this.readDiagnosticInfo();
       default: throw new CodecError(`Unsupported Variant type: ${type}`);
     }
   }

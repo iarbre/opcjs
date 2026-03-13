@@ -7,41 +7,43 @@
  * @module primitives
  */
 
+import { BuiltInType } from "./builtinType";
+
 export type UaBoolean = boolean;
 /**
  * OPC UA Builtin Type Numeric IDs
  * 
  * These correspond to the NodeId numeric identifiers defined in OPC UA Part 6, Table 1.
  */
-export type UaSbyte = {value: number; readonly type: 'sbyte' };
-export const uaSbyte = (value: number): UaSbyte => ({ value, type: 'sbyte' });
+export type UaSbyte = {value: number; readonly type: BuiltInType.SByte };
+export const uaSbyte = (value: number): UaSbyte => ({ value, type: BuiltInType.SByte });
 
-export type UaByte = {value: number; readonly type: 'byte' };
-export const uaByte = (value: number): UaByte => ({ value, type: 'byte' });
+export type UaByte = {value: number; readonly type: BuiltInType.Byte };
+export const uaByte = (value: number): UaByte => ({ value, type: BuiltInType.Byte });
 
-export type UaInt16 = {value: number; readonly type: 'int16' };
-export const uaInt16 = (value: number): UaInt16 => ({ value, type: 'int16' });
+export type UaInt16 = {value: number; readonly type: BuiltInType.Int16 };
+export const uaInt16 = (value: number): UaInt16 => ({ value, type: BuiltInType.Int16 });
 
-export type UaUint16 = {value: number; readonly type: 'uint16' };
-export const uaUint16 = (value: number): UaUint16 => ({ value, type: 'uint16' });
+export type UaUint16 = {value: number; readonly type: BuiltInType.UInt16 };
+export const uaUint16 = (value: number): UaUint16 => ({ value, type: BuiltInType.UInt16 });
 
-export type UaInt32 = {value: number; readonly type: 'int32' };
-export const uaInt32 = (value: number): UaInt32 => ({ value, type: 'int32' });
+export type UaInt32 = {value: number; readonly type: BuiltInType.Int32 };
+export const uaInt32 = (value: number): UaInt32 => ({ value, type: BuiltInType.Int32 });
 
-export type UaUint32 = {value: number; readonly type: 'uint32' };
-export const uaUint32 = (value: number): UaUint32 => ({ value, type: 'uint32' });
+export type UaUint32 = {value: number; readonly type: BuiltInType.UInt32 };
+export const uaUint32 = (value: number): UaUint32 => ({ value, type: BuiltInType.UInt32 });
 
-export type UaInt64 = {value: bigint; readonly type: 'int64' };
-export const uaInt64 = (value: bigint): UaInt64 => ({ value, type: 'int64' });
+export type UaInt64 = {value: bigint; readonly type: BuiltInType.Int64 };
+export const uaInt64 = (value: bigint): UaInt64 => ({ value, type: BuiltInType.Int64 });
 
-export type UaUint64 = {value: bigint; readonly type: 'uint64' };
-export const uaUint64 = (value: bigint): UaUint64 => ({ value, type: 'uint64' });
+export type UaUint64 = {value: bigint; readonly type: BuiltInType.UInt64 };
+export const uaUint64 = (value: bigint): UaUint64 => ({ value, type: BuiltInType.UInt64 });
 
-export type UaFloat = {value: number; readonly type: 'float' };
-export const uaFloat = (value: number): UaFloat => ({ value, type: 'float' });
+export type UaFloat = {value: number; readonly type: BuiltInType.Float };
+export const uaFloat = (value: number): UaFloat => ({ value, type: BuiltInType.Float });
 
-export type UaDouble = {value: number; readonly type: 'double' };
-export const uaDouble = (value: number): UaDouble => ({ value, type: 'double' });
+export type UaDouble = {value: number; readonly type: BuiltInType.Double };
+export const uaDouble = (value: number): UaDouble => ({ value, type: BuiltInType.Double });
 
 /**
  * OPC UA String primitive type.
@@ -55,8 +57,8 @@ export type UaString = string | null;
 
 export type UaDateTime = Date
 
-export type UaGuid = {value: string; readonly type: 'guid' };
-export const uaGuid = (value: string): UaGuid => ({ value, type: 'guid' });
+export type UaGuid = {value: string; readonly type: BuiltInType.Guid};
+export const uaGuid = (value: string): UaGuid => ({ value, type: BuiltInType.Guid });
 
 /**
  * OPC UA ByteString primitive type.
