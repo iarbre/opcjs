@@ -23,7 +23,7 @@
     "README.md"
   ],
   "scripts": {
-    "lint": "npx eslint ./src",
+    "lint": "eslint ./src",
     "verify": "npx tsc --noEmit",
     "build": "tsup",
     "prepublish": "npm run lint && npm run verify && npm run build",
@@ -38,9 +38,12 @@
   "author": "slompf18",
   "license": "MIT",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.0.0",
+    "eslint": "^10.0.2",
     "tsup": "^8.3.5",
     "typescript": "^5.7.3",
+    "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"
   },
   "dependencies": {

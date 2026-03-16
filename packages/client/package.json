@@ -23,7 +23,7 @@
     "README.md"
   ],
   "scripts": {
-    "lint": "npx eslint .",
+    "lint": "eslint .",
     "verify": "npx tsc --noEmit",
     "build": "tsup",
     "dev": "tsup --watch",
