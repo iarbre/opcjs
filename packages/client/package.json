@@ -1,6 +1,6 @@
 {
   "name": "opcjs-client",
-  "version": "0.1.16-alpha",
+  "version": "0.1.17-alpha",
   "description": "A client for OPC UA communication.",
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "test": "vitest",
-    "prepublish": "npm run lint && npm run verify && npm run build"
+    "prepublish": "npm run lint && npm run verify && npm run build && npm run test -- --run"
   },
   "keywords": [
     "opcua",

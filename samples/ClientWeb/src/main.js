@@ -1,4 +1,5 @@
-import { ConfigurationClient, Client, UserIdentity, NodeId } from 'opcjs-client';
+import { ConfigurationClient, Client, UserIdentity } from 'opcjs-client';
+import { NodeId } from 'opcjs-base';
 
 async function run() {
   console.log('Creating OPC UA Client...');

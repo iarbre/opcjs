@@ -51,6 +51,23 @@ export class WebSocketReadableStream extends ReadableStream<Uint8Array> {
     return new Promise<void>((resolve) => {
       this.notifyPull = () => {
         this.notifyPull = null;
+        // Enqueue (or signal error/close) before resolving. This is critical: it
+        // keeps [[pulling]] = true when controller.enqueue() runs, which causes
+        // the stream to set [[pullAgain]] = true. When the promise then resolves,
+        // [[pullAgain]] triggers another pull() call — without this the browser's
+        // WHATWG ReadableStream never re-calls pull() and the pipeline deadlocks.
+        if (this.errored) {
+          controller.error(this.errored);
+          this.cleanup();
+        } else {
+          const chunk = this.buffer.shift();
+          if (chunk !== undefined) {
+            controller.enqueue(chunk);
+          } else if (this.closed) {
+            controller.close();
+            this.cleanup();
+          }
+        }
         resolve();
       };
     });

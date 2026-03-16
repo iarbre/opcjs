@@ -12,7 +12,7 @@
     "vite": "^7.3.1"
   },
   "dependencies": {
-    "opcjs-base": "^0.1.10",
-    "opcjs-client": "^0.1.10"
+    "opcjs-base": "file:../../packages/base",
+    "opcjs-client": "file:../../packages/client"
   }
 }

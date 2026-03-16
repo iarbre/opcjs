@@ -55,7 +55,6 @@ export class Client {
     const webSocketReadableStream = new WebSocketReadableStream(ws, 1000);
     const webSocketWritableStream = new WebSocketWritableStream(ws);
 
-
     const scContext = new SecureChannelContext(this.endpointUrl);
     const tcpMessageInjector = new TcpMessageInjector();
     const tcpConnectionHandler = new TcpConnectionHandler(tcpMessageInjector, scContext);
