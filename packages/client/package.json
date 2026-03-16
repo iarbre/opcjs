@@ -1,10 +1,10 @@
 {
   "name": "opcjs-client",
-  "version": "0.1.15-alpha",
+  "version": "0.1.16-alpha",
   "description": "A client for OPC UA communication.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/iarbre/opcjs.git"
+    "url": "git+https://github.com/iarbre/opcjs.git"
   },
   "type": "module",
   "sideEffects": false,

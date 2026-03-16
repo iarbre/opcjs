@@ -1,10 +1,10 @@
 {
   "name": "opcjs-base",
-  "version": "0.1.15-alpha",
+  "version": "0.1.16-alpha",
   "description": "Base functionalities for OPC UA.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/iarbre/opcjs.git"
+    "url": "git+https://github.com/iarbre/opcjs.git"
   },
   "type": "module",
   "sideEffects": false,
