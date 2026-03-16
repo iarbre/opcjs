@@ -135,7 +135,7 @@ export interface IWriter {
    * Binary: Int32 length prefix + UTF-8 encoded XML
    * @param value The XML string (undefined encoded as length -1)
    */
-  writeXmlElement(value: XmlElement): void;
+  writeXmlElement(value: XmlElement|string): void;
 
   /**
    * Encode an array with Int32 length prefix.

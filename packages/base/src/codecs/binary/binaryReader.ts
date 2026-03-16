@@ -10,15 +10,20 @@ import { StatusCode } from '../../types/statusCode.js';
 import { QualifiedName } from '../../types/qualifiedName.js';
 import { LocalizedText } from '../../types/localizedText.js';
 import { ExtensionObject } from '../../types/extensionObject.js';
-import { ExtensionObjectEncoding } from '../../types/extensionObjectEncoding.js';
 import { DataValue } from '../../types/dataValue.js';
-import { Variant, VariantArrayValue, VariantValue } from '../../types/variant.js';
+import { Variant } from '../../types/variant.js';
 import { DiagnosticInfo } from '../../types/diagnosticInfo.js';
 import type { IReader } from '../interfaces/iReader.js';
-import type { IOpcType } from '../../types/iOpcType.js';
 import { Decoder } from '../decoder.js';
-import { XmlReader } from '../xml/xmlReader.js';
-import { BuiltInType } from '../../types/builtinType.js';
+import { decodeNodeId } from './typesComplex/nodeId.js';
+import { decodeExpandedNodeId } from './typesComplex/expandedNodeId.js';
+import { decodeStatusCode } from './typesComplex/statusCode.js';
+import { decodeQualifiedName } from './typesComplex/qualifiedName.js';
+import { decodeLocalizedText } from './typesComplex/localizedText.js';
+import { decodeExtensionObject } from './typesComplex/extensionObject.js';
+import { decodeDataValue } from './typesComplex/dataValue.js';
+import { decodeVariant } from './typesComplex/variant.js';
+import { decodeDiagnosticInfo } from './typesComplex/diagnosticInfo.js';
 
 /**
  * OPC UA DateTime epoch: January 1, 1601 00:00:00 UTC
@@ -28,53 +33,6 @@ import { BuiltInType } from '../../types/builtinType.js';
 const EPOCH_DIFF_MS = 11644473600000n;
 const TICKS_PER_MS = 10000n;
 
-// === NodeId decoding helpers ===
-
-enum NodeIdEncodingByte {
-  TwoByte = 0x00,
-  FourByte = 0x01,
-  Numeric = 0x02,
-  String = 0x03,
-  Guid = 0x04,
-  ByteString = 0x05,
-}
-
-// === Encoding mask constants ===
-
-const ExpandedNodeIdMask = {
-  ServerIndexFlag: 0x40,
-  NamespaceUriFlag: 0x80,
-} as const;
-
-const LocalizedTextMask = {
-  LocaleFlag: 0x01,
-  TextFlag: 0x02,
-} as const;
-
-const DataValueMaskBits = {
-  Value: 0x01,
-  StatusCode: 0x02,
-  SourceTimestamp: 0x04,
-  ServerTimestamp: 0x08,
-  SourcePicoseconds: 0x10,
-  ServerPicoseconds: 0x20,
-} as const;
-
-const DiagnosticInfoMaskBits = {
-  SymbolicId: 0x01,
-  NamespaceUri: 0x02,
-  LocalizedText: 0x04,
-  Locale: 0x08,
-  AdditionalInfo: 0x10,
-  InnerStatusCode: 0x20,
-  InnerDiagnosticInfo: 0x40,
-} as const;
-
-const VariantMask = {
-  TypeMask: 0x3F,
-  ArrayDimensions: 0x40,
-  Array: 0x80,
-} as const;
 
 /**
  * BinaryReader implements OPC UA Binary decoding per OPC 10000-6 Section 5.2.
@@ -332,7 +290,7 @@ export class BinaryReader implements IReader {
    * @see OPC 10000-6 Tables 16-19
    */
   readNodeId(): NodeId {
-    return this.readNodeIdWithMask(0);
+    return decodeNodeId(this);
   }
 
   /**
@@ -340,29 +298,7 @@ export class BinaryReader implements IReader {
    * @see OPC 10000-6 Table 20
    */
   readExpandedNodeId(): ExpandedNodeId {
-    const startPos = this.position;
-    const encodingByte = this.buffer[startPos];
-
-    const hasNamespaceUri = (encodingByte & ExpandedNodeIdMask.NamespaceUriFlag) !== 0;
-    const hasServerIndex = (encodingByte & ExpandedNodeIdMask.ServerIndexFlag) !== 0;
-
-    const nodeId = this.readNodeIdWithMask(ExpandedNodeIdMask.ServerIndexFlag | ExpandedNodeIdMask.NamespaceUriFlag);
-
-    let namespaceUri: string | undefined = undefined;
-    if (hasNamespaceUri) {
-      const uri = this.readString();
-      if (uri === null) {
-        throw new CodecError('ExpandedNodeId NamespaceUri cannot be null when flag is set');
-      }
-      namespaceUri = uri;
-    }
-
-    let serverIndex: number | undefined = undefined;
-    if (hasServerIndex) {
-      serverIndex = this.readUInt32();
-    }
-
-    return new ExpandedNodeId(nodeId.namespace, nodeId.identifier, namespaceUri, serverIndex);
+    return decodeExpandedNodeId(this);
   }
 
   /**
@@ -370,7 +306,7 @@ export class BinaryReader implements IReader {
    * @see OPC 10000-6 Section 5.2.2.16
    */
   readStatusCode(): StatusCode {
-    return this.readUInt32() as StatusCode;
+    return decodeStatusCode(this);
   }
 
   /**
@@ -378,12 +314,7 @@ export class BinaryReader implements IReader {
    * @see OPC 10000-6 Table 8
    */
   readQualifiedName(): QualifiedName {
-    const namespaceIndex = this.readUInt16();
-    const name = this.readString();
-    if (name === null) {
-      throw new CodecError('QualifiedName name cannot be null');
-    }
-    return new QualifiedName(namespaceIndex, name);
+    return decodeQualifiedName(this);
   }
 
   /**
@@ -391,19 +322,7 @@ export class BinaryReader implements IReader {
    * @see OPC 10000-6 Table 9
    */
   readLocalizedText(): LocalizedText {
-    const encodingMask = this.readByte();
-
-    let locale: string | undefined = undefined;
-    if (encodingMask & LocalizedTextMask.LocaleFlag) {
-      locale = this.readString() ?? undefined;
-    }
-
-    let text = '';
-    if (encodingMask & LocalizedTextMask.TextFlag) {
-      text = this.readString() ?? '';
-    }
-
-    return new LocalizedText(locale, text);
+    return decodeLocalizedText(this);
   }
 
   /**
@@ -411,34 +330,7 @@ export class BinaryReader implements IReader {
    * @see OPC 10000-6 Section 5.2.2.15
    */
   readExtensionObject(decoder: Decoder): ExtensionObject {
-    const typeId = this.readNodeId();
-    const encoding = this.readByte();
-
-    if (encoding !== ExtensionObjectEncoding.None &&
-      encoding !== ExtensionObjectEncoding.Binary &&
-      encoding !== ExtensionObjectEncoding.Xml) {
-      throw new CodecError(`Invalid ExtensionObject encoding byte: ${encoding}. Must be 0, 1, or 2.`);
-    }
-
-    let data: IOpcType | undefined = undefined;
-
-    switch (encoding) {
-      case ExtensionObjectEncoding.None: { break; }
-      case ExtensionObjectEncoding.Binary: {
-        const reader = new BinaryReader(this.readByteString() as Uint8Array);
-        data = decoder.decodeWithEncodingId(typeId.identifier as number, reader);// todo: we need to handle the node id. use different decoders for different namesapces and support other node id types
-
-        break;
-      }
-      case ExtensionObjectEncoding.Xml: {
-        const reader = new XmlReader(this.readString() as string);
-        data = decoder.decodeWithEncodingId(typeId.identifier as number, reader);// todo: we need to handle the node id. use different decoders for different namesapces and support other node id types
-
-        break;
-      }
-    }
-
-    return new ExtensionObject(typeId, encoding, data);
+    return decodeExtensionObject(this, decoder);
   }
 
   /**
@@ -446,39 +338,7 @@ export class BinaryReader implements IReader {
    * @see OPC 10000-6 Table 26
    */
   readDataValue(decoder: Decoder): DataValue {
-    const encodingMask = this.readByte();
-
-    let value: Variant | undefined = undefined;
-    if (encodingMask & DataValueMaskBits.Value) {
-      value = this.readVariant(decoder);
-    }
-
-    let statusCode: StatusCode | undefined = undefined;
-    if (encodingMask & DataValueMaskBits.StatusCode) {
-      statusCode = this.readUInt32() as StatusCode;
-    }
-
-    let sourceTimestamp: Date | undefined = undefined;
-    if (encodingMask & DataValueMaskBits.SourceTimestamp) {
-      sourceTimestamp = this.readDateTime();
-    }
-
-    let serverTimestamp: Date | undefined = undefined;
-    if (encodingMask & DataValueMaskBits.ServerTimestamp) {
-      serverTimestamp = this.readDateTime();
-    }
-
-    let sourcePicoseconds: number | undefined = undefined;
-    if (encodingMask & DataValueMaskBits.SourcePicoseconds) {
-      sourcePicoseconds = this.readUInt16();
-    }
-
-    let serverPicoseconds: number | undefined = undefined;
-    if (encodingMask & DataValueMaskBits.ServerPicoseconds) {
-      serverPicoseconds = this.readUInt16();
-    }
-
-    return new DataValue(value, statusCode, sourceTimestamp, serverTimestamp, sourcePicoseconds, serverPicoseconds);
+    return decodeDataValue(this, decoder);
   }
 
   /**
@@ -486,47 +346,7 @@ export class BinaryReader implements IReader {
    * @see OPC 10000-6 Section 5.2.2.16
    */
   readVariant(decoder: Decoder): Variant {
-    const mask = this.readByte();
-    const type = mask & VariantMask.TypeMask;
-
-    if (type > 25) {
-      throw new CodecError(`Invalid Variant type ID: ${type}. Must be 0-25.`);
-    }
-
-    const hasArray = (mask & VariantMask.Array) !== 0;
-    const hasDimensions = (mask & VariantMask.ArrayDimensions) !== 0;
-
-    let value: VariantValue | VariantArrayValue | undefined;
-
-    if (hasArray) {
-      const length = this.readInt32();
-      if (length < 0) {
-        throw new CodecError(`Invalid array length: ${length}`);
-      }
-      const array: unknown[] = [];
-      for (let i = 0; i < length; i++) {
-        array.push(this.readVariantValue(type, decoder));
-      }
-      value = array as VariantArrayValue;
-    } else if (type === BuiltInType.Null) {
-      value = undefined;
-    } else {
-      value = this.readVariantValue(type, decoder) as VariantValue;
-    }
-
-    let dimensions: number[] | undefined = undefined;
-    if (hasDimensions) {
-      const dimCount = this.readInt32();
-      if (dimCount < 0) {
-        throw new CodecError(`Invalid dimensions count: ${dimCount}`);
-      }
-      dimensions = [];
-      for (let i = 0; i < dimCount; i++) {
-        dimensions.push(this.readInt32());
-      }
-    }
-
-    return new Variant(type, value, dimensions);
+    return decodeVariant(this, decoder);
   }
 
   /**
@@ -535,140 +355,10 @@ export class BinaryReader implements IReader {
    * @see OPC 10000-6 Table 24
    */
   readDiagnosticInfo(): DiagnosticInfo {
-    const encodingMask = this.readByte();
-
-    let symbolicId: number | undefined = undefined;
-    if (encodingMask & DiagnosticInfoMaskBits.SymbolicId) {
-      symbolicId = this.readInt32();
-    }
-
-    let namespaceUri: number | undefined = undefined;
-    if (encodingMask & DiagnosticInfoMaskBits.NamespaceUri) {
-      namespaceUri = this.readInt32();
-    }
-
-    let localizedText: number | undefined = undefined;
-    if (encodingMask & DiagnosticInfoMaskBits.LocalizedText) {
-      localizedText = this.readInt32();
-    }
-
-    let locale: number | undefined = undefined;
-    if (encodingMask & DiagnosticInfoMaskBits.Locale) {
-      locale = this.readInt32();
-    }
-
-    let additionalInfo: string | undefined = undefined;
-    if (encodingMask & DiagnosticInfoMaskBits.AdditionalInfo) {
-      additionalInfo = this.readString() ?? undefined;
-    }
-
-    let innerStatusCode: StatusCode | undefined = undefined;
-    if (encodingMask & DiagnosticInfoMaskBits.InnerStatusCode) {
-      innerStatusCode = this.readUInt32() as StatusCode;
-    }
-
-    let innerDiagnosticInfo: DiagnosticInfo | undefined = undefined;
-    if (encodingMask & DiagnosticInfoMaskBits.InnerDiagnosticInfo) {
-      innerDiagnosticInfo = this.readDiagnosticInfo();
-    }
-
-    return new DiagnosticInfo({
-      symbolicId,
-      namespaceUri,
-      localizedText,
-      locale,
-      additionalInfo,
-      innerStatusCode,
-      innerDiagnosticInfo,
-    });
+    return decodeDiagnosticInfo(this);
   }
 
-  // === Private helpers ===
 
-  /**
-   * Decode a NodeId with optional flag masking (used internally by readExpandedNodeId).
-   */
-  private readNodeIdWithMask(maskBits: number): NodeId {
-    let encodingByte = this.readByte();
-    if (maskBits !== 0) {
-      encodingByte = encodingByte & ~maskBits;
-    }
-
-    switch (encodingByte) {
-      case NodeIdEncodingByte.TwoByte: {
-        const identifier = this.readByte();
-        return new NodeId(0, identifier);
-      }
-      case NodeIdEncodingByte.FourByte: {
-        const namespace = this.readByte();
-        const identifier = this.readUInt16();
-        return new NodeId(namespace, identifier);
-      }
-      case NodeIdEncodingByte.Numeric: {
-        const namespace = this.readUInt16();
-        const identifier = this.readUInt32();
-        return new NodeId(namespace, identifier);
-      }
-      case NodeIdEncodingByte.String: {
-        const namespace = this.readUInt16();
-        const identifier = this.readString();
-        if (identifier === null) {
-          throw new CodecError('NodeId String identifier cannot be null');
-        }
-        return new NodeId(namespace, identifier);
-      }
-      case NodeIdEncodingByte.Guid: {
-        const namespace = this.readUInt16();
-        const identifier = this.readGuid();
-        return new NodeId(namespace, identifier);
-      }
-      case NodeIdEncodingByte.ByteString: {
-        const namespace = this.readUInt16();
-        const identifier = this.readByteString();
-        if (identifier === null) {
-          throw new CodecError('NodeId ByteString identifier cannot be null');
-        }
-        return new NodeId(namespace, identifier);
-      }
-      default:
-        throw new CodecError(
-          `Invalid NodeId encoding byte: 0x${encodingByte.toString(16).padStart(2, '0')}`,
-          { format: 'Binary', suggestedAction: 'Check encoded data for corruption' },
-        );
-    }
-  }
-
-  private readVariantValue(type: BuiltInType, decoder: Decoder): unknown {
-    switch (type) {
-      case BuiltInType.Null: return null;
-      case BuiltInType.Boolean: return this.readBoolean();
-      case BuiltInType.SByte: return this.readSByte();
-      case BuiltInType.Byte: return this.readByte();
-      case BuiltInType.Int16: return this.readInt16();
-      case BuiltInType.UInt16: return this.readUInt16();
-      case BuiltInType.Int32: return this.readInt32();
-      case BuiltInType.UInt32: return this.readUInt32();
-      case BuiltInType.Int64: return this.readInt64();
-      case BuiltInType.UInt64: return this.readUInt64();
-      case BuiltInType.Float: return this.readFloat();
-      case BuiltInType.Double: return this.readDouble();
-      case BuiltInType.String: return this.readString();
-      case BuiltInType.DateTime: return this.readDateTime();
-      case BuiltInType.Guid: return this.readGuid();
-      case BuiltInType.ByteString: return this.readByteString();
-      case BuiltInType.XmlElement: return this.readXmlElement();
-      case BuiltInType.NodeId: return this.readNodeId();
-      case BuiltInType.ExpandedNodeId: return this.readExpandedNodeId();
-      case BuiltInType.StatusCode: return this.readStatusCode();
-      case BuiltInType.QualifiedName: return this.readQualifiedName();
-      case BuiltInType.LocalizedText: return this.readLocalizedText();
-      case BuiltInType.ExtensionObject: return this.readExtensionObject(decoder);
-      case BuiltInType.DataValue: return this.readDataValue(decoder);
-      case BuiltInType.Variant: return this.readVariant(decoder);
-      case BuiltInType.DiagnosticInfo: return this.readDiagnosticInfo();
-      default: throw new CodecError(`Unsupported Variant type: ${type}`);
-    }
-  }
 
   getPosition(): number {
     return this.position;

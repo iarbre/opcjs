@@ -4,20 +4,27 @@
  */
 
 import { CodecError } from '../codecError.js';
-import { NodeId, NodeIdType } from '../../types/nodeId.js';
+import { NodeId } from '../../types/nodeId.js';
 import { ExpandedNodeId } from '../../types/expandedNodeId.js';
 import { StatusCode } from '../../types/statusCode.js';
 import { QualifiedName } from '../../types/qualifiedName.js';
 import { LocalizedText } from '../../types/localizedText.js';
 import { ExtensionObject } from '../../types/extensionObject.js';
-import { ExtensionObjectEncoding } from '../../types/extensionObjectEncoding.js';
 import { DataValue } from '../../types/dataValue.js';
 import { Variant } from '../../types/variant.js';
 import { DiagnosticInfo } from '../../types/diagnosticInfo.js';
 import { IWriter } from '../interfaces/iWriter.js';
 import { Encoder } from '../encoder.js';
 import { XmlElement } from '../../types/xmlElement.js';
-import { BuiltInType } from '../../types/builtinType.js';
+import { encodeNodeId } from './typesComplex/nodeId.js';
+import { encodeExpandedNodeId } from './typesComplex/expandedNodeId.js';
+import { encodeStatusCode } from './typesComplex/statusCode.js';
+import { encodeQualifiedName } from './typesComplex/qualifiedName.js';
+import { encodeLocalizedText } from './typesComplex/localizedText.js';
+import { encodeExtensionObject } from './typesComplex/extensionObject.js';
+import { encodeDataValue } from './typesComplex/dataValue.js';
+import { encodeVariant } from './typesComplex/variant.js';
+import { encodeDiagnosticInfo } from './typesComplex/diagnosticInfo.js';
 
 /**
  * OPC UA DateTime epoch: January 1, 1601 00:00:00 UTC
@@ -27,77 +34,6 @@ import { BuiltInType } from '../../types/builtinType.js';
 const EPOCH_DIFF_MS = 11644473600000n;
 const TICKS_PER_MS = 10000n;
 
-// === NodeId encoding helpers ===
-// todo: refactor the complex type coding into separate files.
-enum NodeIdEncodingByte {
-  TwoByte = 0x00,
-  FourByte = 0x01,
-  Numeric = 0x02,
-  String = 0x03,
-  Guid = 0x04,
-  ByteString = 0x05,
-}
-
-function selectNodeIdEncodingFormat(nodeId: NodeId): NodeIdEncodingByte {
-  if (nodeId.identifierType === NodeIdType.Numeric) {
-    const id = nodeId.identifier as number;
-    const ns = nodeId.namespace;
-    if (ns === 0 && id >= 0 && id <= 255) {
-      return NodeIdEncodingByte.TwoByte;
-    }
-    if (ns >= 0 && ns <= 255 && id >= 0 && id <= 65535) {
-      return NodeIdEncodingByte.FourByte;
-    }
-    return NodeIdEncodingByte.Numeric;
-  }
-  if (nodeId.identifierType === NodeIdType.String) {
-    return NodeIdEncodingByte.String;
-  }
-  if (nodeId.identifierType === NodeIdType.Guid) {
-    return NodeIdEncodingByte.Guid;
-  }
-  if (nodeId.identifierType === NodeIdType.ByteString) {
-    return NodeIdEncodingByte.ByteString;
-  }
-  throw new CodecError(`Invalid NodeId identifier type: ${nodeId.identifierType}`);
-}
-
-// === Encoding mask constants ===
-
-const ExpandedNodeIdMask = {
-  ServerIndexFlag: 0x40,
-  NamespaceUriFlag: 0x80,
-} as const;
-
-const LocalizedTextMask = {
-  LocaleFlag: 0x01,
-  TextFlag: 0x02,
-} as const;
-
-const DataValueMaskBits = {
-  Value: 0x01,
-  StatusCode: 0x02,
-  SourceTimestamp: 0x04,
-  ServerTimestamp: 0x08,
-  SourcePicoseconds: 0x10,
-  ServerPicoseconds: 0x20,
-} as const;
-
-const DiagnosticInfoMaskBits = {
-  SymbolicId: 0x01,
-  NamespaceUri: 0x02,
-  LocalizedText: 0x04,
-  Locale: 0x08,
-  AdditionalInfo: 0x10,
-  InnerStatusCode: 0x20,
-  InnerDiagnosticInfo: 0x40,
-} as const;
-
-const VariantMask = {
-  TypeMask: 0x3F,
-  ArrayDimensions: 0x40,
-  Array: 0x80,
-} as const;
 
 /**
  * BinaryEncoder implements OPC UA Binary encoding per OPC 10000-6 Section 5.2.
@@ -374,49 +310,7 @@ export class BinaryWriter implements IWriter {
    * @see OPC 10000-6 Tables 16-19
    */
   writeNodeId(value: NodeId): void {
-    const format = selectNodeIdEncodingFormat(value);
-
-    switch (format) {
-      case NodeIdEncodingByte.TwoByte:
-        this.writeByte(NodeIdEncodingByte.TwoByte);
-        this.writeByte(value.identifier as number);
-        break;
-
-      case NodeIdEncodingByte.FourByte:
-        this.writeByte(NodeIdEncodingByte.FourByte);
-        this.writeByte(value.namespace);
-        this.writeUInt16(value.identifier as number);
-        break;
-
-      case NodeIdEncodingByte.Numeric:
-        this.writeByte(NodeIdEncodingByte.Numeric);
-        this.writeUInt16(value.namespace);
-        this.writeUInt32(value.identifier as number);
-        break;
-
-      case NodeIdEncodingByte.String:
-        this.writeByte(NodeIdEncodingByte.String);
-        this.writeUInt16(value.namespace);
-        this.writeString(value.identifier as string);
-        break;
-
-      case NodeIdEncodingByte.Guid:
-        this.writeByte(NodeIdEncodingByte.Guid);
-        this.writeUInt16(value.namespace);
-        this.writeGuid(value.identifier as string);
-        break;
-
-      case NodeIdEncodingByte.ByteString: {
-        this.writeByte(NodeIdEncodingByte.ByteString);
-        this.writeUInt16(value.namespace);
-        const ident = value.identifier;
-        this.writeByteString(ident as Uint8Array);
-        break;
-      }
-
-      default:
-        throw new CodecError(`Unsupported NodeId encoding format: ${format}`);
-    }
+    encodeNodeId(this, value);
   }
 
   /**
@@ -424,26 +318,7 @@ export class BinaryWriter implements IWriter {
    * @see OPC 10000-6 Table 20
    */
   writeExpandedNodeId(value: ExpandedNodeId): void {
-    const startPos = this.position;
-    this.writeNodeId(value);
-
-    let encodingByte = this.buffer[startPos];
-
-    if (value.namespaceUri !== undefined) {
-      encodingByte |= ExpandedNodeIdMask.NamespaceUriFlag;
-    }
-    if (value.serverIndex !== undefined) {
-      encodingByte |= ExpandedNodeIdMask.ServerIndexFlag;
-    }
-
-    this.buffer[startPos] = encodingByte;
-
-    if (value.namespaceUri !== undefined) {
-      this.writeString(value.namespaceUri);
-    }
-    if (value.serverIndex !== undefined) {
-      this.writeUInt32(value.serverIndex);
-    }
+    encodeExpandedNodeId(this, value);
   }
 
   /**
@@ -451,7 +326,7 @@ export class BinaryWriter implements IWriter {
    * @see OPC 10000-6 Section 5.2.2.16
    */
   writeStatusCode(value: StatusCode): void {
-    this.writeUInt32(value);
+    encodeStatusCode(this, value);
   }
 
   /**
@@ -459,8 +334,7 @@ export class BinaryWriter implements IWriter {
    * @see OPC 10000-6 Table 8
    */
   writeQualifiedName(value: QualifiedName): void {
-    this.writeUInt16(value.namespaceIndex);
-    this.writeString(value.name);
+    encodeQualifiedName(this, value);
   }
 
   /**
@@ -468,20 +342,7 @@ export class BinaryWriter implements IWriter {
    * @see OPC 10000-6 Table 9
    */
   writeLocalizedText(value: LocalizedText): void {
-    let encodingMask = 0;
-    if (value.locale !== undefined && value.locale !== '') {
-      encodingMask |= LocalizedTextMask.LocaleFlag;
-    }
-    if (value.text !== '') {
-      encodingMask |= LocalizedTextMask.TextFlag;
-    }
-    this.writeByte(encodingMask);
-    if (encodingMask & LocalizedTextMask.LocaleFlag) {
-      this.writeString(value.locale!);
-    }
-    if (encodingMask & LocalizedTextMask.TextFlag) {
-      this.writeString(value.text);
-    }
+    encodeLocalizedText(this, value);
   }
 
   /**
@@ -489,40 +350,7 @@ export class BinaryWriter implements IWriter {
    * @see OPC 10000-6 Section 5.2.2.15
    */
   writeExtensionObject(value: ExtensionObject, encoder: Encoder): void {
-    const typeId = value.typeId;
-    if ('namespaceUri' in typeId || 'serverIndex' in typeId) {
-      this.writeExpandedNodeId(typeId as ExpandedNodeId);
-    } else {
-      this.writeNodeId(typeId);
-    }
-
-    this.writeByte(value.encoding);
-
-    switch (value.encoding) {
-      case ExtensionObjectEncoding.None:
-        break;
-      case ExtensionObjectEncoding.Binary:
-        {
-          if (!value.data) {
-            throw new CodecError('ExtensionObject with Binary encoding must have data');
-          }
-
-          const binaryData = encoder.encodeWithoutId(value.data, 'binary') as Uint8Array;
-          this.writeByteString(binaryData);
-          break;
-        }
-      case ExtensionObjectEncoding.Xml:
-        {
-          if (!value.data) {
-            throw new CodecError('ExtensionObject with Xml encoding must have data');
-          }
-          const xmlString = encoder.encodeWithoutId(value.data, 'xml') as string;
-          this.writeXmlElement(xmlString);
-          break;
-        }
-      default:
-        throw new CodecError(`Invalid ExtensionObject encoding: ${value.encoding}`);
-    }
+    encodeExtensionObject(this, value, encoder);
   }
 
   /**
@@ -530,46 +358,7 @@ export class BinaryWriter implements IWriter {
    * @see OPC 10000-6 Table 26
    */
   writeDataValue(value: DataValue, encoder: Encoder): void {
-    let encodingMask = 0;
-    if (value.value !== null && value.value !== undefined) {
-      encodingMask |= DataValueMaskBits.Value;
-    }
-    if (value.statusCode !== null) {
-      encodingMask |= DataValueMaskBits.StatusCode;
-    }
-    if (value.sourceTimestamp !== null) {
-      encodingMask |= DataValueMaskBits.SourceTimestamp;
-    }
-    if (value.serverTimestamp !== null) {
-      encodingMask |= DataValueMaskBits.ServerTimestamp;
-    }
-    if (value.sourcePicoseconds !== null) {
-      encodingMask |= DataValueMaskBits.SourcePicoseconds;
-    }
-    if (value.serverPicoseconds !== null) {
-      encodingMask |= DataValueMaskBits.ServerPicoseconds;
-    }
-
-    this.writeByte(encodingMask);
-
-    if (encodingMask & DataValueMaskBits.Value) {
-      this.writeVariant(value.value as Variant, encoder);
-    }
-    if (encodingMask & DataValueMaskBits.StatusCode) {
-      this.writeUInt32(value.statusCode ?? StatusCode.Good);
-    }
-    if (encodingMask & DataValueMaskBits.SourceTimestamp) {
-      this.writeDateTime(value.sourceTimestamp!);
-    }
-    if (encodingMask & DataValueMaskBits.ServerTimestamp) {
-      this.writeDateTime(value.serverTimestamp!);
-    }
-    if (encodingMask & DataValueMaskBits.SourcePicoseconds) {
-      this.writeUInt16(value.sourcePicoseconds!);
-    }
-    if (encodingMask & DataValueMaskBits.ServerPicoseconds) {
-      this.writeUInt16(value.serverPicoseconds!);
-    }
+    encodeDataValue(this, value, encoder);
   }
 
   /**
@@ -577,38 +366,7 @@ export class BinaryWriter implements IWriter {
    * @see OPC 10000-6 Section 5.2.2.16
    */
   writeVariant(value: Variant, encoder: Encoder): void {
-    if (value.type < 0 || value.type > 25) {
-      throw new CodecError(`Invalid Variant type ID: ${value.type}. Must be 0-25.`);
-    }
-
-    let mask = value.type & VariantMask.TypeMask;
-    const isArrayValue = Array.isArray(value.value);
-
-    if (isArrayValue) {
-      mask |= VariantMask.Array;
-    }
-    if (value.arrayDimensions !== undefined && value.arrayDimensions.length > 0) {
-      mask |= VariantMask.ArrayDimensions;
-    }
-
-    this.writeByte(mask);
-
-    if (isArrayValue) {
-      const array = value.value as unknown[];
-      this.writeInt32(array.length);
-      for (const elem of array) {
-        this.writeVariantValue(value.type, elem, encoder);
-      }
-    } else if (value.type !== BuiltInType.Null) {
-      this.writeVariantValue(value.type, value.value, encoder);
-    }
-
-    if (value.arrayDimensions !== undefined && value.arrayDimensions.length > 0) {
-      this.writeInt32(value.arrayDimensions.length);
-      for (const dim of value.arrayDimensions) {
-        this.writeInt32(dim);
-      }
-    }
+    encodeVariant(this, value, encoder);
   }
 
   /**
@@ -617,58 +375,7 @@ export class BinaryWriter implements IWriter {
    * @see OPC 10000-6 Table 24
    */
   writeDiagnosticInfo(value: DiagnosticInfo): void {
-    let encodingMask = 0;
-    if (value.symbolicId !== null) { encodingMask |= DiagnosticInfoMaskBits.SymbolicId; }
-    if (value.namespaceUri !== null) { encodingMask |= DiagnosticInfoMaskBits.NamespaceUri; }
-    if (value.localizedText !== null) { encodingMask |= DiagnosticInfoMaskBits.LocalizedText; }
-    if (value.locale !== null) { encodingMask |= DiagnosticInfoMaskBits.Locale; }
-    if (value.additionalInfo !== null) { encodingMask |= DiagnosticInfoMaskBits.AdditionalInfo; }
-    if (value.innerStatusCode !== null) { encodingMask |= DiagnosticInfoMaskBits.InnerStatusCode; }
-    if (value.innerDiagnosticInfo !== null) { encodingMask |= DiagnosticInfoMaskBits.InnerDiagnosticInfo; }
-
-    this.writeByte(encodingMask);
-
-    if (encodingMask & DiagnosticInfoMaskBits.SymbolicId) { this.writeInt32(value.symbolicId!); }
-    if (encodingMask & DiagnosticInfoMaskBits.NamespaceUri) { this.writeInt32(value.namespaceUri!); }
-    if (encodingMask & DiagnosticInfoMaskBits.LocalizedText) { this.writeInt32(value.localizedText!); }
-    if (encodingMask & DiagnosticInfoMaskBits.Locale) { this.writeInt32(value.locale!); }
-    if (encodingMask & DiagnosticInfoMaskBits.AdditionalInfo) { this.writeString(value.additionalInfo!); }
-    if (encodingMask & DiagnosticInfoMaskBits.InnerStatusCode) { this.writeUInt32(value.innerStatusCode ?? StatusCode.Good); }
-    if (encodingMask & DiagnosticInfoMaskBits.InnerDiagnosticInfo) { this.writeDiagnosticInfo(value.innerDiagnosticInfo!); }
-  }
-
-  // === Private helpers ===
-
-  private writeVariantValue(type: BuiltInType, value: unknown, encoder: Encoder): void {
-    switch (type) {
-      case BuiltInType.Null: break;
-      case BuiltInType.Boolean: this.writeBoolean(value as boolean); break;
-      case BuiltInType.SByte: this.writeSByte(value as number); break;
-      case BuiltInType.Byte: this.writeByte(value as number); break;
-      case BuiltInType.Int16: this.writeInt16(value as number); break;
-      case BuiltInType.UInt16: this.writeUInt16(value as number); break;
-      case BuiltInType.Int32: this.writeInt32(value as number); break;
-      case BuiltInType.UInt32: this.writeUInt32(value as number); break;
-      case BuiltInType.Int64: this.writeInt64(value as bigint); break;
-      case BuiltInType.UInt64: this.writeUInt64(value as bigint); break;
-      case BuiltInType.Float: this.writeFloat(value as number); break;
-      case BuiltInType.Double: this.writeDouble(value as number); break;
-      case BuiltInType.String: this.writeString(value as string); break;
-      case BuiltInType.DateTime: this.writeDateTime(value as Date); break;
-      case BuiltInType.Guid: this.writeGuid(value as string); break;
-      case BuiltInType.ByteString: this.writeByteString(value as Uint8Array); break;
-      case BuiltInType.XmlElement: this.writeXmlElement(value as string); break;
-      case BuiltInType.NodeId: this.writeNodeId(value as NodeId); break;
-      case BuiltInType.ExpandedNodeId: this.writeExpandedNodeId(value as ExpandedNodeId); break;
-      case BuiltInType.StatusCode: this.writeStatusCode(value as StatusCode); break;
-      case BuiltInType.QualifiedName: this.writeQualifiedName(value as QualifiedName); break;
-      case BuiltInType.LocalizedText: this.writeLocalizedText(value as LocalizedText); break;
-      case BuiltInType.ExtensionObject: this.writeExtensionObject(value as ExtensionObject, encoder); break;
-      case BuiltInType.DataValue: this.writeDataValue(value as DataValue, encoder); break;
-      case BuiltInType.Variant: this.writeVariant(value as Variant, encoder); break;
-      case BuiltInType.DiagnosticInfo: this.writeDiagnosticInfo(value as DiagnosticInfo); break;
-      default: throw new CodecError(`Unsupported Variant type: ${type}`);
-    }
+    encodeDiagnosticInfo(this, value);
   }
 
   constructor(initialSize: number = 1024) {

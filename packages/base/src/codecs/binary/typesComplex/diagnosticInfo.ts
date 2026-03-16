@@ -1,188 +1,99 @@
-// /**
-//  * @fileoverview DiagnosticInfo type definition and encoder/decoder
-//  * @module codec/complex/diagnosticinfo
-//  * 
-//  * DiagnosticInfo represents detailed diagnostic information for errors.
-//  * This is a recursive structure with optional fields controlled by an encoding mask.
-//  * 
-//  * @see OPC 10000-6 Section 5.2.2.12 - DiagnosticInfo
-//  * @see OPC 10000-4 Section 7.12 - DiagnosticInfo
-//  * @see FR-020 - DiagnosticInfo encoding mask
-//  */
+/**
+ * @fileoverview DiagnosticInfo binary decoder
+ * @module codec/binary/typesComplex/diagnosticInfo
+ * @see OPC 10000-6 Section 5.2.2.12 - DiagnosticInfo
+ * @see OPC 10000-4 Section 7.12 - DiagnosticInfo
+ */
 
-// import { IWriter } from '../../interfaces/encoder.js';
-// import { IDecoder } from '../../interfaces/decoder.js';
-// import { DiagnosticInfo } from '../../../types/diagnosticInfo.js';
-// import { StatusCode } from '../../../types/statusCode.js';
+import type { IReader } from '../../interfaces/iReader.js';import type { IWriter } from '../../interfaces/iWriter.js';import { DiagnosticInfo } from '../../../types/diagnosticInfo.js';
+import { StatusCode } from '../../../types/statusCode.js';
 
-// /**
-//  * DiagnosticInfo encoding mask bits per OPC 10000-6 Table 24
-//  */
-// export const enum DiagnosticInfoMask {
-//   SymbolicId = 0x01,          // Bit 0: SymbolicId is present
-//   NamespaceUri = 0x02,        // Bit 1: NamespaceUri is present
-//   LocalizedText = 0x04,       // Bit 2: LocalizedText is present
-//   Locale = 0x08,              // Bit 3: Locale is present
-//   AdditionalInfo = 0x10,      // Bit 4: AdditionalInfo is present
-//   InnerStatusCode = 0x20,     // Bit 5: InnerStatusCode is present
-//   InnerDiagnosticInfo = 0x40  // Bit 6: InnerDiagnosticInfo is present
-// }
+const DiagnosticInfoMaskBits = {
+  SymbolicId: 0x01,
+  NamespaceUri: 0x02,
+  LocalizedText: 0x04,
+  Locale: 0x08,
+  AdditionalInfo: 0x10,
+  InnerStatusCode: 0x20,
+  InnerDiagnosticInfo: 0x40,
+} as const;
 
-// /**
-//  * Encode a DiagnosticInfo in Binary format.
-//  * 
-//  * Encoding format per OPC 10000-6 Table 24:
-//  * - EncodingMask: Byte
-//  * - SymbolicId: Int32 (if bit 0 set)
-//  * - NamespaceUri: Int32 (if bit 1 set)
-//  * - LocalizedText: Int32 (if bit 2 set)
-//  * - Locale: Int32 (if bit 3 set)
-//  * - AdditionalInfo: String (if bit 4 set)
-//  * - InnerStatusCode: StatusCode (if bit 5 set)
-//  * - InnerDiagnosticInfo: DiagnosticInfo (if bit 6 set, recursive)
-//  * 
-//  * @param encoder The binary encoder
-//  * @param value The DiagnosticInfo to encode
-//  * 
-//  * @see OPC 10000-6 Table 24 - DiagnosticInfo encoding
-//  * @see FR-020 - DiagnosticInfo encoding mask
-//  */
-// export function diagnosticInfoEncodeBinary(
-//   encoder: IWriter,
-//   value: DiagnosticInfo
-// ): void {
-//   // Calculate encoding mask
-//   let encodingMask = 0;
-  
-//   if (value.symbolicId !== null) {
-//     encodingMask |= DiagnosticInfoMask.SymbolicId;
-//   }
-  
-//   if (value.namespaceUri !== null) {
-//     encodingMask |= DiagnosticInfoMask.NamespaceUri;
-//   }
-  
-//   if (value.localizedText !== null) {
-//     encodingMask |= DiagnosticInfoMask.LocalizedText;
-//   }
-  
-//   if (value.locale !== null) {
-//     encodingMask |= DiagnosticInfoMask.Locale;
-//   }
-  
-//   if (value.additionalInfo !== null) {
-//     encodingMask |= DiagnosticInfoMask.AdditionalInfo;
-//   }
-  
-//   if (value.innerStatusCode !== null) {
-//     encodingMask |= DiagnosticInfoMask.InnerStatusCode;
-//   }
-  
-//   if (value.innerDiagnosticInfo !== null) {
-//     encodingMask |= DiagnosticInfoMask.InnerDiagnosticInfo;
-//   }
-  
-//   // Write encoding mask
-//   encoder.writeByte(encodingMask);
-  
-//   // Write SymbolicId if present
-//   if (encodingMask & DiagnosticInfoMask.SymbolicId) {
-//     encoder.writeInt32(value.symbolicId!);
-//   }
-  
-//   // Write NamespaceUri if present
-//   if (encodingMask & DiagnosticInfoMask.NamespaceUri) {
-//     encoder.writeInt32(value.namespaceUri!);
-//   }
-  
-//   // Write LocalizedText if present
-//   if (encodingMask & DiagnosticInfoMask.LocalizedText) {
-//     encoder.writeInt32(value.localizedText!);
-//   }
-  
-//   // Write Locale if present
-//   if (encodingMask & DiagnosticInfoMask.Locale) {
-//     encoder.writeInt32(value.locale!);
-//   }
-  
-//   // Write AdditionalInfo if present
-//   if (encodingMask & DiagnosticInfoMask.AdditionalInfo) {
-//     encoder.writeString(value.additionalInfo!);
-//   }
-  
-//   // Write InnerStatusCode if present
-//   if (encodingMask & DiagnosticInfoMask.InnerStatusCode) {
-//     encoder.writeUInt32(value.innerStatusCode!.getValue());
-//   }
-  
-//   // Write InnerDiagnosticInfo if present (recursive)
-//   if (encodingMask & DiagnosticInfoMask.InnerDiagnosticInfo) {
-//     diagnosticInfoEncodeBinary(encoder, value.innerDiagnosticInfo!);
-//   }
-// }
+/**
+ * Decode a DiagnosticInfo with optional fields controlled by an encoding mask.
+ * Supports recursive InnerDiagnosticInfo.
+ * @see OPC 10000-6 Table 24
+ */
+export function decodeDiagnosticInfo(reader: IReader): DiagnosticInfo {
+  const encodingMask = reader.readByte();
 
-// /**
-//  * Decode a DiagnosticInfo from Binary format.
-//  * 
-//  * @param decoder The binary decoder
-//  * @returns The decoded DiagnosticInfo
-//  * 
-//  * @see OPC 10000-6 Table 24 - DiagnosticInfo encoding
-//  */
-// export function diagnosticInfoDecodeBinary(decoder: IDecoder): DiagnosticInfo {
-//   // Read encoding mask
-//   const encodingMask = decoder.readByte();
-  
-//   // Read SymbolicId if present
-//   let symbolicId: number | null = null;
-//   if (encodingMask & DiagnosticInfoMask.SymbolicId) {
-//     symbolicId = decoder.readInt32();
-//   }
-  
-//   // Read NamespaceUri if present
-//   let namespaceUri: number | null = null;
-//   if (encodingMask & DiagnosticInfoMask.NamespaceUri) {
-//     namespaceUri = decoder.readInt32();
-//   }
-  
-//   // Read LocalizedText if present
-//   let localizedText: number | null = null;
-//   if (encodingMask & DiagnosticInfoMask.LocalizedText) {
-//     localizedText = decoder.readInt32();
-//   }
-  
-//   // Read Locale if present
-//   let locale: number | null = null;
-//   if (encodingMask & DiagnosticInfoMask.Locale) {
-//     locale = decoder.readInt32();
-//   }
-  
-//   // Read AdditionalInfo if present
-//   let additionalInfo: string | null = null;
-//   if (encodingMask & DiagnosticInfoMask.AdditionalInfo) {
-//     additionalInfo = decoder.readString();
-//   }
-  
-//   // Read InnerStatusCode if present
-//   let innerStatusCode: StatusCode | null = null;
-//   if (encodingMask & DiagnosticInfoMask.InnerStatusCode) {
-//     const code = decoder.readUInt32();
-//     innerStatusCode = new StatusCode(code);
-//   }
-  
-//   // Read InnerDiagnosticInfo if present (recursive)
-//   let innerDiagnosticInfo: DiagnosticInfo | null = null;
-//   if (encodingMask & DiagnosticInfoMask.InnerDiagnosticInfo) {
-//     innerDiagnosticInfo = diagnosticInfoDecodeBinary(decoder);
-//   }
-  
-//   return new DiagnosticInfo({
-//     symbolicId,
-//     namespaceUri,
-//     localizedText,
-//     locale,
-//     additionalInfo,
-//     innerStatusCode,
-//     innerDiagnosticInfo
-//   });
-// }
+  let symbolicId: number | undefined = undefined;
+  if (encodingMask & DiagnosticInfoMaskBits.SymbolicId) {
+    symbolicId = reader.readInt32();
+  }
+
+  let namespaceUri: number | undefined = undefined;
+  if (encodingMask & DiagnosticInfoMaskBits.NamespaceUri) {
+    namespaceUri = reader.readInt32();
+  }
+
+  let localizedText: number | undefined = undefined;
+  if (encodingMask & DiagnosticInfoMaskBits.LocalizedText) {
+    localizedText = reader.readInt32();
+  }
+
+  let locale: number | undefined = undefined;
+  if (encodingMask & DiagnosticInfoMaskBits.Locale) {
+    locale = reader.readInt32();
+  }
+
+  let additionalInfo: string | undefined = undefined;
+  if (encodingMask & DiagnosticInfoMaskBits.AdditionalInfo) {
+    additionalInfo = reader.readString() ?? undefined;
+  }
+
+  let innerStatusCode: StatusCode | undefined = undefined;
+  if (encodingMask & DiagnosticInfoMaskBits.InnerStatusCode) {
+    innerStatusCode = reader.readUInt32() as StatusCode;
+  }
+
+  let innerDiagnosticInfo: DiagnosticInfo | undefined = undefined;
+  if (encodingMask & DiagnosticInfoMaskBits.InnerDiagnosticInfo) {
+    innerDiagnosticInfo = decodeDiagnosticInfo(reader);
+  }
+
+  return new DiagnosticInfo({
+    symbolicId,
+    namespaceUri,
+    localizedText,
+    locale,
+    additionalInfo,
+    innerStatusCode,
+    innerDiagnosticInfo,
+  });
+}
+
+/**
+ * Encode a DiagnosticInfo with optional fields controlled by an encoding mask.
+ * Supports recursive InnerDiagnosticInfo.
+ * @see OPC 10000-6 Table 24
+ */
+export function encodeDiagnosticInfo(writer: IWriter, value: DiagnosticInfo): void {
+  let encodingMask = 0;
+  if (value.symbolicId !== null) { encodingMask |= DiagnosticInfoMaskBits.SymbolicId; }
+  if (value.namespaceUri !== null) { encodingMask |= DiagnosticInfoMaskBits.NamespaceUri; }
+  if (value.localizedText !== null) { encodingMask |= DiagnosticInfoMaskBits.LocalizedText; }
+  if (value.locale !== null) { encodingMask |= DiagnosticInfoMaskBits.Locale; }
+  if (value.additionalInfo !== null) { encodingMask |= DiagnosticInfoMaskBits.AdditionalInfo; }
+  if (value.innerStatusCode !== null) { encodingMask |= DiagnosticInfoMaskBits.InnerStatusCode; }
+  if (value.innerDiagnosticInfo !== null) { encodingMask |= DiagnosticInfoMaskBits.InnerDiagnosticInfo; }
+
+  writer.writeByte(encodingMask);
+
+  if (encodingMask & DiagnosticInfoMaskBits.SymbolicId) { writer.writeInt32(value.symbolicId!); }
+  if (encodingMask & DiagnosticInfoMaskBits.NamespaceUri) { writer.writeInt32(value.namespaceUri!); }
+  if (encodingMask & DiagnosticInfoMaskBits.LocalizedText) { writer.writeInt32(value.localizedText!); }
+  if (encodingMask & DiagnosticInfoMaskBits.Locale) { writer.writeInt32(value.locale!); }
+  if (encodingMask & DiagnosticInfoMaskBits.AdditionalInfo) { writer.writeString(value.additionalInfo!); }
+  if (encodingMask & DiagnosticInfoMaskBits.InnerStatusCode) { writer.writeUInt32(value.innerStatusCode ?? StatusCode.Good); }
+  if (encodingMask & DiagnosticInfoMaskBits.InnerDiagnosticInfo) { encodeDiagnosticInfo(writer, value.innerDiagnosticInfo!); }
+}

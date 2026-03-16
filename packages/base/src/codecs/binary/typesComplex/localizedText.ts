@@ -1,97 +1,48 @@
-// /**
-//  * @fileoverview LocalizedText type definition and encoder/decoder
-//  * @module codec/complex/localized-text
-//  * 
-//  * LocalizedText represents human-readable text with an optional locale.
-//  * 
-//  * @see OPC 10000-6 Section 5.2.2.14 - LocalizedText
-//  * @see OPC 10000-3 Section 7.19 - LocalizedText
-//  * @see FR-013 - Support LocalizedText with/without locale
-//  */
+/**
+ * @fileoverview LocalizedText binary codec (encoder + decoder)
+ * @module codec/binary/typesComplex/localizedText
+ * @see OPC 10000-6 Section 5.2.2.14 - LocalizedText
+ * @see OPC 10000-3 Section 7.19 - LocalizedText
+ */
 
-// import { LocalizedText } from "../../../types/localizedText";
-// import { IDecoder } from "../../interfaces/decoder";
-// import { IWriter } from "../../interfaces/encoder";
-// /**
-//  * LocalizedText encoding mask bits per OPC 10000-6 Table 9
-//  */
-// const enum LocalizedTextMask {
-//   LocaleFlag = 0x01,    // Bit 0: Locale is present
-//   TextFlag = 0x02       // Bit 1: Text is present
-// }
+import type { IReader } from '../../interfaces/iReader.js';
+import type { IWriter } from '../../interfaces/iWriter.js';
+import { LocalizedText } from '../../../types/localizedText.js';
 
-// /**
-//  * Encode a LocalizedText in Binary format.
-//  * 
-//  * Encoding format:
-//  * - EncodingMask: Byte (bit 0 = Locale present, bit 1 = Text present)
-//  * - Locale: String (if flag set)
-//  * - Text: String (if flag set)
-//  * 
-//  * @param encoder The binary encoder
-//  * @param value The LocalizedText to encode
-//  * 
-//  * @see OPC 10000-6 Table 9 - LocalizedText encoding
-//  */
-// export function localizedTextEncodeBinary(encoder: IWriter, value: LocalizedText): void {
-//   // Calculate encoding mask
-//   let encodingMask = 0;
-  
-//   if (value.locale !== undefined && value.locale !== '') {
-//     encodingMask |= LocalizedTextMask.LocaleFlag;
-//   }
-  
-//   if (value.text !== '') {
-//     encodingMask |= LocalizedTextMask.TextFlag;
-//   }
-  
-//   // Write encoding mask
-//   encoder.writeByte(encodingMask);
-  
-//   // Write Locale if present
-//   if (encodingMask & LocalizedTextMask.LocaleFlag) {
-//     encoder.writeString(value.locale!);
-//   }
-  
-//   // Write Text if present
-//   if (encodingMask & LocalizedTextMask.TextFlag) {
-//     encoder.writeString(value.text);
-//   }
-// }
+const LocalizedTextMask = {
+  LocaleFlag: 0x01,
+  TextFlag: 0x02,
+} as const;
 
-// /**
-//  * Decode a LocalizedText from Binary format.
-//  * 
-//  * @param decoder The binary decoder
-//  * @returns The decoded LocalizedText
-//  * 
-//  * @see OPC 10000-6 Table 9 - LocalizedText encoding
-//  */
-// export function localizedTextDecodeBinary(decoder: IDecoder): LocalizedText {
-//   // Read encoding mask
-//   const encodingMask = decoder.readByte();
-  
-//   // Read Locale if present
-//   let locale: string | undefined = undefined;
-//   if (encodingMask & LocalizedTextMask.LocaleFlag) {
-//     locale = decoder.readString() || undefined;
-//   }
-  
-//   // Read Text if present
-//   let text = '';
-//   if (encodingMask & LocalizedTextMask.TextFlag) {
-//     text = decoder.readString() || '';
-//   }
-  
-//   return new LocalizedText(locale, text);
-// }
+/**
+ * Decode a LocalizedText with optional locale and text.
+ * @see OPC 10000-6 Table 9
+ */
+export function decodeLocalizedText(reader: IReader): LocalizedText {
+  const encodingMask = reader.readByte();
 
-// // /**
-// //  * Helper function to create a LocalizedText.
-// //  */
-// // export function localizedText(locale: string | null | undefined, text: string | null): LocalizedText {
-// //   return new LocalizedText(
-// //     locale || undefined,
-// //     text || ''
-// //   );
-// // }
+  let locale: string | undefined = undefined;
+  if (encodingMask & LocalizedTextMask.LocaleFlag) {
+    locale = reader.readString() ?? undefined;
+  }
+
+  let text = '';
+  if (encodingMask & LocalizedTextMask.TextFlag) {
+    text = reader.readString() ?? '';
+  }
+
+  return new LocalizedText(locale, text);
+}
+
+/**
+ * Encode a LocalizedText with optional locale and text.
+ * @see OPC 10000-6 Table 9
+ */
+export function encodeLocalizedText(writer: IWriter, value: LocalizedText): void {
+  let encodingMask = 0;
+  if (value.locale !== undefined && value.locale !== '') { encodingMask |= LocalizedTextMask.LocaleFlag; }
+  if (value.text !== '') { encodingMask |= LocalizedTextMask.TextFlag; }
+  writer.writeByte(encodingMask);
+  if (encodingMask & LocalizedTextMask.LocaleFlag) { writer.writeString(value.locale!); }
+  if (encodingMask & LocalizedTextMask.TextFlag) { writer.writeString(value.text); }
+}

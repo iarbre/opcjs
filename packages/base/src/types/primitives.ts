@@ -1,13 +1,16 @@
 /**
  * OPC UA Primitive Type Mappings
  * 
- * Defines TypeScript type mappings for OPC UA primitive types.
- * Primitives map directly to native TypeScript types without wrapper classes.
- * 
+ * We try to use the JS built in types wherever we can. But sometimes, often in the context
+ * where Variant is involved, we need to have a wrapper type that includes the BuiltInType 
+ * for type checking and encoding purposes. In those cases, we define a wrapper type with a 
+ * value and a type field. For simple cases like boolean, we can just use the native boolean 
+ * type directly as UaBoolean.
  * @module primitives
  */
 
 import { BuiltInType } from "./builtinType";
+
 
 export type UaBoolean = boolean;
 /**
@@ -51,24 +54,15 @@ export const uaDouble = (value: number): UaDouble => ({ value, type: BuiltInType
  * A String in OPC UA can be null (encoded as length -1 in binary).
  * Using `string | null` instead of `string | undefined` aligns with the
  * OPC UA specification where null is an explicit, valid value distinct
- * from an empty string.
+ * from an empty string. Same is true for ByteString which can be null (length -1) 
+ * or a Uint8Array.
  */
 export type UaString = string | null;
-
-export type UaDateTime = Date
+export type UaByteString = Uint8Array | null;
 
 export type UaGuid = {value: string; readonly type: BuiltInType.Guid};
 export const uaGuid = (value: string): UaGuid => ({ value, type: BuiltInType.Guid });
-
-/**
- * OPC UA ByteString primitive type.
- *
- * A ByteString in OPC UA can be null (encoded as length -1 in binary).
- * Using `Uint8Array | null` instead of `Uint8Array | undefined` aligns
- * with the OPC UA specification where null is an explicit, valid value
- * distinct from an empty byte array.
- */
-export type UaByteString = Uint8Array | null;
+export type UaDateTime = Date
 
 /**
  * Union of all OPC UA primitive types accepted by {@link Variant.newFrom}.

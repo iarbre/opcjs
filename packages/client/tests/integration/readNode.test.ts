@@ -44,12 +44,20 @@ describe('readNode', () => {
         await client.connect();
         console.log('Connected successfully!');
 
-        const receivedData = await new Promise((resolve) => {
+        const receivedDatas = await new Promise((resolve) => {
             client.subscribe([NodeId.newString(2, 'Scalar_Simulation_Double')], (datas) => {
                 resolve(datas)
             })
-        });
+        }) as {
+            id: NodeId;
+            value: unknown;
+        }[];
 
-        console.log('Received data:', receivedData);
+        expect(receivedDatas).toHaveLength(1);
+        const receivedData = receivedDatas[0];
+        expect(receivedData).toHaveProperty('value');
+        expect(receivedData).toHaveProperty('id');
+        expect(receivedData.id).toEqual(NodeId.newString(2, 'Scalar_Simulation_Double'));
+        expect(typeof receivedData.value).toBe('number');
     });
 });
