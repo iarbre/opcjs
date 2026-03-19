@@ -1,3 +1,3 @@
 export class CallMethodResult {
-    constructor(public values:unknown[], public status:string){}
+    constructor(public values: unknown[], public statusCode: number) {}
 }

@@ -264,141 +264,101 @@ export enum StatusCode {
 }
 
 /**
- * Human-readable descriptions for OPC UA status codes.
- * Sourced from OPC UA Part 6, Annex A.
+ * Converts an OPC UA status code to a human-readable string.
+ *
+ * OPC UA status codes have two independent parts (OPC UA Part 4, §7.38 / Part 6, §5.1.1):
+ *
+ *   Bits 31:30  Severity   00=Good, 01=Uncertain, 10/11=Bad
+ *   Bits 27:16  SubCode    Named code (e.g. 0x34 = NodeIdUnknown)
+ *   Bit  15     StructureChanged – data type structure of the variable changed
+ *   Bit  14     SemanticsChanged – engineering unit or range of the variable changed
+ *   Bits 13:12  InfoType   00=not used, 01=DataValue info bits active
+ *   Bit  11     Overflow   – (DataValue) notifications dropped from queue
+ *   Bits 10:9   LimitBits  – (DataValue) 00=None, 01=Low, 10=High, 11=Constant
+ *
+ * All named codes (BadNodeIdUnknown, Good, …) have their lower 16 bits = 0.
+ * The lower 16 bits are flag bits and are decoded separately via {@link StatusCodeGetFlagBits}.
+ *
+ * @see OPC UA Part 4, Section 7.38
+ * @see OPC UA Part 6, Section 5.1.1 and Annex A
  */
-const statusCodeDescriptions: Partial<Record<StatusCode, string>> = {
-  [StatusCode.Good]: 'No error.',
-  [StatusCode.Uncertain]: 'The value is uncertain.',
-  [StatusCode.Bad]: 'The value is bad.',
-  [StatusCode.BadUnexpectedError]: 'An unexpected error occurred.',
-  [StatusCode.BadInternalError]: 'An internal error occurred as a result of a programming or configuration error.',
-  [StatusCode.BadOutOfMemory]: 'Not enough memory to complete the operation.',
-  [StatusCode.BadResourceUnavailable]: 'An operating system resource is not available.',
-  [StatusCode.BadCommunicationError]: 'A low-level communication error occurred.',
-  [StatusCode.BadEncodingError]: 'Encoding halted because of invalid data in the objects being serialised.',
-  [StatusCode.BadDecodingError]: 'Decoding halted because of invalid data in the stream.',
-  [StatusCode.BadEncodingLimitsExceeded]: 'The message encoding/decoding limits imposed by the server have been exceeded.',
-  [StatusCode.BadRequestTooLarge]: 'The request message size exceeds limits set by the server.',
-  [StatusCode.BadResponseTooLarge]: 'The response message size exceeds limits set by the client.',
-  [StatusCode.BadUnknownResponse]: 'An unrecognised response was received from the server.',
-  [StatusCode.BadTimeout]: 'The operation timed out.',
-  [StatusCode.BadServiceUnsupported]: 'The server does not support the requested service.',
-  [StatusCode.BadShutdown]: 'The operation was abandoned because the server is shutting down.',
-  [StatusCode.BadServerNotConnected]: 'The operation could not be completed because the client is not connected to the server.',
-  [StatusCode.BadServerHalted]: 'The server has stopped and cannot process any requests.',
-  [StatusCode.BadNothingToDo]: 'There was nothing to do because the client passed a list of operations with no elements.',
-  [StatusCode.BadTooManyOperations]: 'The request could not be processed because it specified too many operations.',
-  [StatusCode.BadTooManyMonitoredItems]: 'The request could not be processed because there are too many monitored items in the subscription.',
-  [StatusCode.BadDataTypeIdUnknown]: 'The extension object cannot be decoded because its data type is unknown.',
-  [StatusCode.BadCertificateInvalid]: 'The certificate provided as a parameter is not valid.',
-  [StatusCode.BadSecurityChecksFailed]: 'An error occurred verifying security.',
-  [StatusCode.BadCertificateTimeInvalid]: 'The certificate has expired or is not yet valid.',
-  [StatusCode.BadCertificateIssuerTimeInvalid]: 'An issuer certificate has expired or is not yet valid.',
-  [StatusCode.BadCertificateHostNameInvalid]: 'The HostName used to connect to a server does not match a HostName in the certificate.',
-  [StatusCode.BadCertificateUriInvalid]: 'The URI specified in the ApplicationDescription does not match the URI in the certificate.',
-  [StatusCode.BadCertificateUseNotAllowed]: 'The certificate may not be used for the requested operation.',
-  [StatusCode.BadCertificateIssuerUseNotAllowed]: 'The issuer certificate may not be used for the requested operation.',
-  [StatusCode.BadCertificateUntrusted]: 'The certificate is not trusted.',
-  [StatusCode.BadCertificateRevocationUnknown]: 'It was not possible to determine if the certificate has been revoked.',
-  [StatusCode.BadCertificateIssuerRevocationUnknown]: 'It was not possible to determine if the issuer certificate has been revoked.',
-  [StatusCode.BadCertificateRevoked]: 'The certificate has been revoked.',
-  [StatusCode.BadCertificateIssuerRevoked]: 'The issuer certificate has been revoked.',
-  [StatusCode.BadUserAccessDenied]: 'User does not have permission to perform the requested operation.',
-  [StatusCode.BadIdentityTokenInvalid]: 'The user identity token is not valid.',
-  [StatusCode.BadIdentityTokenRejected]: 'The user identity token is valid but the server has rejected it.',
-  [StatusCode.BadSecureChannelIdInvalid]: 'The specified secure channel is no longer valid.',
-  [StatusCode.BadInvalidTimestamp]: 'The timestamp is outside the range allowed by the server.',
-  [StatusCode.BadNonceInvalid]: 'The nonce does not appear to be a random value or it is not the correct length.',
-  [StatusCode.BadSessionIdInvalid]: 'The session ID is not valid.',
-  [StatusCode.BadSessionClosed]: 'The session was closed by the client.',
-  [StatusCode.BadSessionNotActivated]: 'The session cannot be used because ActivateSession has not been called.',
-  [StatusCode.BadSubscriptionIdInvalid]: 'The subscription ID is not valid.',
-  [StatusCode.BadRequestHeaderInvalid]: 'The header for the request is missing or invalid.',
-  [StatusCode.BadTimestampsToReturnInvalid]: 'The timestamps-to-return parameter is invalid.',
-  [StatusCode.BadRequestCancelledByClient]: 'The request was cancelled by the client with the Cancel service.',
-  [StatusCode.BadNoCommunication]: 'Communication with the data source is defined, but not established, and there is no last known value available.',
-  [StatusCode.BadNodeIdInvalid]: 'The syntax of the node ID is not valid.',
-  [StatusCode.BadNodeIdUnknown]: 'The node ID refers to a node that does not exist in the server address space.',
-  [StatusCode.BadAttributeIdInvalid]: 'The attribute is not supported for the specified Node.',
-  [StatusCode.BadIndexRangeInvalid]: 'The syntax of the index range parameter is invalid.',
-  [StatusCode.BadIndexRangeNoData]: 'No data exists within the range of indexes specified.',
-  [StatusCode.BadDataEncodingInvalid]: 'The data encoding is invalid.',
-  [StatusCode.BadDataEncodingUnsupported]: 'The server does not support the requested data encoding for the node.',
-  [StatusCode.BadNotReadable]: 'The access level does not allow reading or subscribing to the Node.',
-  [StatusCode.BadNotWritable]: 'The access level does not allow writing to the Node.',
-  [StatusCode.BadOutOfRange]: 'The value was out of range.',
-  [StatusCode.BadNotSupported]: 'The requested operation is not supported.',
-  [StatusCode.BadNotFound]: 'A requested item was not found or a search operation ended without success.',
-  [StatusCode.BadObjectDeleted]: 'The object cannot be used because it has been deleted.',
-  [StatusCode.BadMonitoringModeInvalid]: 'The monitoring mode is invalid.',
-  [StatusCode.BadMonitoredItemIdInvalid]: 'The monitored item ID does not refer to a valid monitored item.',
-  [StatusCode.BadMonitoredItemFilterInvalid]: 'The monitored item filter parameter is not valid.',
-  [StatusCode.BadMonitoredItemFilterUnsupported]: 'The server does not support the requested combination of monitoring parameters.',
-  [StatusCode.BadFilterNotAllowed]: 'A monitoring filter cannot be used in combination with the attribute specified.',
-  [StatusCode.BadContinuationPointInvalid]: 'The continuation point provided is no longer valid.',
-  [StatusCode.BadNoContinuationPoints]: 'The operation could not be processed because all continuation points have been allocated.',
-  [StatusCode.BadReferenceTypeIdInvalid]: 'The reference type ID does not refer to a valid reference type node.',
-  [StatusCode.BadBrowseDirectionInvalid]: 'The browse direction is not valid.',
-  [StatusCode.BadNodeNotInView]: 'The node is not part of the view.',
-  [StatusCode.BadServerUriInvalid]: 'The server URI is not a valid URI.',
-  [StatusCode.BadRequestTypeInvalid]: 'The type of security token request is not valid.',
-  [StatusCode.BadSecurityModeRejected]: 'The security mode does not meet the requirements set by the server.',
-  [StatusCode.BadSecurityPolicyRejected]: 'The security policy does not meet the requirements set by the server.',
-  [StatusCode.BadTooManySessions]: 'The server has reached its maximum number of sessions.',
-  [StatusCode.BadUserSignatureInvalid]: 'The user signature is missing or invalid.',
-  [StatusCode.BadApplicationSignatureInvalid]: 'The signature generated with the client certificate is missing or invalid.',
-  [StatusCode.BadNoValidCertificates]: 'The server requires a hardware security module, but none is available.',
-  [StatusCode.BadIdentityChangeNotSupported]: 'The server does not support changing the user identity assigned to the session.',
-  [StatusCode.BadMethodInvalid]: 'The method ID does not refer to a method for the specified object.',
-  [StatusCode.BadArgumentsMissing]: 'The client did not specify all of the input arguments for the method.',
-  [StatusCode.BadNotExecutable]: 'The executable attribute does not allow the execution of the method.',
-  [StatusCode.BadTooManySubscriptions]: 'The server has reached the maximum number of subscriptions.',
-  [StatusCode.BadTooManyPublishRequests]: 'The server has reached the maximum number of queued publish requests.',
-  [StatusCode.BadNoSubscription]: 'There is no subscription available for this session.',
-  [StatusCode.BadSequenceNumberUnknown]: 'The sequence number is unknown to the server.',
-  [StatusCode.BadMessageNotAvailable]: 'The requested notification message is no longer available.',
-  [StatusCode.BadInsufficientClientProfile]: 'The client of the current session does not support one or more Profiles that are necessary for the subscription.',
-  [StatusCode.BadMaxAgeInvalid]: 'The max age parameter is invalid.',
-  [StatusCode.BadSecurityModeInsufficient]: 'The operation is not permitted over the current secure channel.',
-  [StatusCode.BadViewIdUnknown]: 'The view ID does not refer to a valid view node.',
-  [StatusCode.BadViewTimestampInvalid]: 'The view timestamp is not available or not supported.',
-  [StatusCode.BadViewParameterMismatch]: 'The view parameters are not consistent with each other.',
-  [StatusCode.BadViewVersionInvalid]: 'The view version is not available or not supported.',
-  [StatusCode.BadInvalidArgument]: 'One or more arguments are invalid.',
-  [StatusCode.BadConnectionRejected]: 'Could not establish a network connection to remote server.',
-  [StatusCode.BadInvalidState]: 'The operation is not permitted in the current state.',
-  [StatusCode.BadTcpServerTooBusy]: 'The server is currently unable to handle the request because of resource limitations.',
-  [StatusCode.BadTcpMessageTypeInvalid]: 'The server does not recognise the type of the message.',
-  [StatusCode.BadTcpSecureChannelUnknown]: 'The secure channel ID sent in the message does not exist or has expired.',
-  [StatusCode.BadTcpEndpointUrlInvalid]: 'The server endpoint URL provided is not a recognised endpoint URL.',
-  [StatusCode.BadRequestTimeout]: 'The server timed out waiting for the request.',
-  [StatusCode.BadSecureChannelClosed]: 'The secure channel has been closed.',
-  [StatusCode.BadSecureChannelTokenUnknown]: 'The token has expired or is not recognised.',
-  [StatusCode.BadConfigurationError]: 'Initialising the application failed due to a configuration error.',
-  [StatusCode.BadNotConnected]: 'The server is not connected to the underlying system.',
-  [StatusCode.BadProtocolVersionUnsupported]: 'The applications do not have compatible protocol versions.',
-};
 
 /**
- * Converts an OPC UA status code to a human-readable string including the symbolic name,
- * hex value, and a plain-English description where available.
+ * Returns the name of the StatusCode enum member for the given code.
+ * Flag bits (lower 16 bits) are masked off before looking up the name.
+ * Returns the hex string if the code is not in the enum.
  *
  * Examples:
- *   - `Good (0x00000000)`
- *   - `BadNodeIdUnknown (0x80340000): The node ID refers to a node that does not exist in the server address space.`
- *   - `0x80FF0000` (for unknown codes)
+ *   StatusCodeToString(0x00000000) → "Good"
+ *   StatusCodeToString(0x80340000) → "BadNodeIdUnknown"
+ *   StatusCodeToString(0x00000400) → "Good"  (flags ignored for name lookup)
+ *   StatusCodeToString(undefined)  → "Unknown"
  *
- * @see OPC UA Part 6, Annex A
+ * @see OPC UA Part 4, Section 7.38
  */
 export function StatusCodeToString(statusCode?: number): string {
   if (statusCode === undefined) {
     return 'Unknown';
   }
-  const hex = `0x${statusCode.toString(16).toUpperCase().padStart(8, '0')}`;
+
+  const baseCode = statusCode & 0xFFFF0000;
   const name = (Object.entries(StatusCode) as [string, number][])
-    .find(([, v]) => v === statusCode)?.[0];
-  const description = statusCodeDescriptions[statusCode as StatusCode];
-  const nameWithHex = name ? `${name} (${hex})` : hex;
-  return description ? `${nameWithHex}: ${description}` : nameWithHex;
+    .find(([, v]) => v === baseCode)?.[0];
+  return name ?? `0x${baseCode.toString(16).toUpperCase().padStart(8, '0')}`;
+}
+
+/**
+ * Returns the full status code value (including flag bits) as an uppercase hex string.
+ *
+ * Examples:
+ *   StatusCodeToStringNumber(0x00000000) → "0x00000000"
+ *   StatusCodeToStringNumber(0x80340000) → "0x80340000"
+ *   StatusCodeToStringNumber(0x00000400) → "0x00000400"
+ */
+export function StatusCodeToStringNumber(statusCode?: number): string {
+  if (statusCode === undefined) {
+    return '0xUNKNOWN';
+  }
+
+  return `0x${statusCode.toString(16).toUpperCase().padStart(8, '0')}`;
+}
+
+/** Flag bits decoded from the lower 16 bits of an OPC UA StatusCode value. */
+export interface StatusCodeFlagBits {
+  /** Bit 15 – the data type structure of the variable has changed. */
+  StructureChanged: boolean;
+  /** Bit 14 – engineering unit or range of the variable has changed. */
+  SemanticsChanged: boolean;
+  /** Bit 11 – notifications were dropped from the queue (DataValue). */
+  Overflow: boolean;
+  /** Bits 10:9 = 01 – value is pegged at the low engineering limit. */
+  LimitLow: boolean;
+  /** Bits 10:9 = 10 – value is pegged at the high engineering limit. */
+  LimitHigh: boolean;
+  /** Bits 10:9 = 11 – value is a constant and cannot change. */
+  LimitConstant: boolean;
+}
+
+/**
+ * Decodes the flag bits (lower 16 bits) of a StatusCode value.
+ *
+ * Examples:
+ *   StatusCodeGetFlagBits(0x00000000) → { StructureChanged: false, SemanticsChanged: false, … }
+ *   StatusCodeGetFlagBits(0x00000400) → { …, LimitHigh: true, … }
+ *   StatusCodeGetFlagBits(0x00008C00) → { StructureChanged: true, Overflow: true, LimitHigh: true, … }
+ *
+ * @see OPC UA Part 6, Section 5.1.1, Table 49
+ */
+export function StatusCodeGetFlagBits(statusCode?: number): StatusCodeFlagBits {
+  const flagBits = (statusCode ?? 0) & 0x0000FFFF;
+  const limitBits = (flagBits >> 9) & 0x3;
+
+  return {
+    StructureChanged: (flagBits & 0x8000) !== 0,
+    SemanticsChanged: (flagBits & 0x4000) !== 0,
+    Overflow: (flagBits & 0x0800) !== 0,
+    LimitLow: limitBits === 1,
+    LimitHigh: limitBits === 2,
+    LimitConstant: limitBits === 3,
+  };
 }

@@ -25,4 +25,4 @@ coverage
 *.bak
 
 # macOS
-.DS_Store
+.DS_Storepackages/client/tests/bin/uaNetRefServer/core

@@ -136,7 +136,7 @@ export class Client {
 
   async read(ids: NodeId[]): Promise<ReadValueResult[]> {
     const result = await this.attributeService?.ReadValue(ids);
-    return result?.map((r) => new ReadValueResult(r.value, r.status)) || [];
+    return result?.map((r) => new ReadValueResult(r.value, r.statusCode)) || [];
   }
 
   /**
@@ -159,7 +159,7 @@ export class Client {
     const responses = await this.methodService!.call([request]);
     const response = responses[0];
 
-    return new CallMethodResult(response.value, response.status);
+    return new CallMethodResult(response.value, response.statusCode);
   }
 
   async browse(

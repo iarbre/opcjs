@@ -1,6 +1,6 @@
 import {
     getLogger, ISecureChannel, NodeId, QualifiedName, ReadRequest, ReadResponse, ReadValueId,
-    StatusCode, StatusCodeToString, TimestampsToReturnEnum,
+    StatusCode, StatusCodeToString, StatusCodeToStringNumber, TimestampsToReturnEnum,
 } from "opcjs-base";
 import { AttrIdValue } from "./attributeServiceAttributes";
 import { ServiceBase } from "./serviceBase";
@@ -14,13 +14,13 @@ export class AttributeService extends ServiceBase {
      * @param nodeIds - NodeIds of the Nodes to read.
      * @param maxAge - Maximum age of the cached value in milliseconds the server may return. 0 = always current value.
      * @param timestampsToReturn - Which timestamps to include in results. Default: Source.
-     * @returns Array of results containing value and status string, one per requested NodeId.
+     * @returns Array of results containing value and raw status code number, one per requested NodeId.
      */
     async ReadValue(
         nodeIds: NodeId[],
         maxAge: number = 0,
         timestampsToReturn: TimestampsToReturnEnum = TimestampsToReturnEnum.Source,
-    ): Promise<{ status: string, value: unknown }[]> {
+    ): Promise<{ statusCode: number, value: unknown }[]> {
         const readValueIds = nodeIds.map(ni => {
             const readValueId = new ReadValueId();
             readValueId.nodeId = ni;
@@ -41,13 +41,13 @@ export class AttributeService extends ServiceBase {
 
         const serviceResult = response.responseHeader?.serviceResult;
         if (serviceResult !== undefined && serviceResult !== StatusCode.Good) {
-            throw new Error(`ReadRequest failed: ${StatusCodeToString(serviceResult)}`);
+            throw new Error(`ReadRequest failed: ${StatusCodeToString(serviceResult)} (${StatusCodeToStringNumber(serviceResult)})`);
         }
 
-        const results = new Array<{ status: string, value: unknown }>();
+        const results = new Array<{ statusCode: number, value: unknown }>();
         for (const dataValue of response.results ?? []) {
             results.push({
-                status: StatusCodeToString(dataValue.statusCode),
+                statusCode: dataValue.statusCode ?? StatusCode.Good,
                 value: dataValue.value as unknown,
             });
         }

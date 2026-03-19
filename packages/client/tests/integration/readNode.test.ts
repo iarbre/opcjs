@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { Client } from '../../src/client.js';
 import { ConfigurationClient } from '../../src/configurationClient.js';
 import { UserIdentity } from '../../src/userIdentity.js';
-import { NodeId } from 'opcjs-base';
+import { NodeId, StatusCode } from 'opcjs-base';
 
 describe('readNode', () => {
     it('readNode', async () => {
@@ -32,8 +32,8 @@ describe('readNode', () => {
         // Check that the result is a Variant
         expect(results[0]).toHaveProperty('value');
         // Check that the StatusCode is good (0 = Good)
-        expect(results[0].status).toBeDefined();
-        expect(results[0].status).toContain("Good");
+        expect(results[0].statusCode).toBeDefined();
+        expect(results[0].statusCode).toBe(StatusCode.Good);
     });
 
     it('subscribe', async () => {
