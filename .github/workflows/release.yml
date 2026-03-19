@@ -97,6 +97,10 @@ jobs:
             echo "${current%%-*}"
           }
 
+          # Workspace file for sharing versions with later steps.
+          VERSIONS_FILE="$GITHUB_WORKSPACE/.versions.env"
+          > "$VERSIONS_FILE"
+
           if [[ "$BRANCH" == "main" ]]; then
             for pkg in $PACKAGES; do
               stripped=$(read_stripped "packages/${pkg}/package.json")
@@ -106,6 +110,7 @@ jobs:
               patch="${patch:-0}"
               new_ver="${major}.${minor}.$((patch + 1))"
               echo "${pkg}_version=${new_ver}" >> "$GITHUB_OUTPUT"
+              echo "${pkg}_version=${new_ver}" >> "$VERSIONS_FILE"
               # Use base package to derive the release tag.
               if [[ "$pkg" == "base" ]]; then
                 echo "release_tag=v${new_ver}" >> "$GITHUB_OUTPUT"
@@ -128,6 +133,7 @@ jobs:
                 new_ver="${BRANCH_MAJOR}.${BRANCH_MINOR}.0-${NPM_CHANNEL}"
               fi
               echo "${pkg}_version=${new_ver}" >> "$GITHUB_OUTPUT"
+              echo "${pkg}_version=${new_ver}" >> "$VERSIONS_FILE"
               if [[ "$pkg" == "base" ]]; then
                 echo "release_tag=v${new_ver}" >> "$GITHUB_OUTPUT"
               fi
@@ -136,9 +142,10 @@ jobs:
 
       - name: Bump versions in all package.json files
         run: |
+          source "$GITHUB_WORKSPACE/.versions.env"
           for pkg in ${{ steps.packages.outputs.list }}; do
             ver_key="${pkg}_version"
-            new_ver=$(grep "^${ver_key}=" "$GITHUB_OUTPUT" | cut -d= -f2-)
+            new_ver="${!ver_key}"
             echo "Bumping packages/${pkg} to ${new_ver}"
             npm version "${new_ver}" --no-git-tag-version --prefix "packages/${pkg}"
           done
@@ -156,10 +163,11 @@ jobs:
       - name: Build release body
         id: body
         run: |
+          source "$GITHUB_WORKSPACE/.versions.env"
           BODY="## Packages"$'\n'
           for pkg in ${{ steps.packages.outputs.list }}; do
             ver_key="${pkg}_version"
-            new_ver=$(grep "^${ver_key}=" "$GITHUB_OUTPUT" | cut -d= -f2-)
+            new_ver="${!ver_key}"
             name=$(node -p "require('./packages/${pkg}/package.json').name")
             BODY+="- \`${name}@${new_ver}\`"$'\n'
           done
