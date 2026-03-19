@@ -21,9 +21,6 @@ on:
   workflow_dispatch:
   release:
     types: [created]
-  push:
-    branches:
-      - '*/v*'
 
 permissions:
   contents: read
@@ -86,11 +83,7 @@ jobs:
       - name: Determine npm tag
         id: tag
         run: |
-          if [[ "${{ github.event_name }}" == "push" ]]; then
-            # Push to */v* branch: extract channel from branch name (e.g. dev/v0.1 -> dev).
-            BRANCH="${{ github.ref_name }}"
-            echo "value=${BRANCH%%/*}" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+          if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
             PKG_TAG="${{ github.event.release.tag_name }}"
             echo "value=${PKG_TAG##*-}" >> "$GITHUB_OUTPUT"
           else
