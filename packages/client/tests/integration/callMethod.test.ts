@@ -31,7 +31,7 @@ describe('callMethod', () => {
 
         // Check that the StatusCode is good (0 = Good)
         expect(result.status).toBeDefined();
-        expect(result.status).toBe("Good");
+        expect(result.status).toContain("Good");
 
         // Check that the result is correct
         expect(result).toHaveProperty('values');

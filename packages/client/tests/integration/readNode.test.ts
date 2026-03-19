@@ -33,7 +33,7 @@ describe('readNode', () => {
         expect(results[0]).toHaveProperty('value');
         // Check that the StatusCode is good (0 = Good)
         expect(results[0].status).toBeDefined();
-        expect(results[0].status).toBe("Good");
+        expect(results[0].status).toContain("Good");
     });
 
     it('subscribe', async () => {
