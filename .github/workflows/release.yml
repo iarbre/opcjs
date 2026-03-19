@@ -78,13 +78,6 @@ jobs:
       - name: Install dependencies for all packages
         run: npm ci
 
-      - name: Prepublish all packages
-        run: |
-          for pkg in ${{ steps.packages.outputs.list }}; do
-            echo "=== prepublish: packages/${pkg} ==="
-            npm run prepublish --prefix "packages/${pkg}"
-          done
-
       - name: Compute new versions
         id: version
         run: |

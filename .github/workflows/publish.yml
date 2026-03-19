@@ -1,7 +1,9 @@
-# Publishes all packages to npm when a GitHub release is created.
+# Publishes all packages to npm when a GitHub release is created or on push to dev branches.
 #
 # Triggered by:
-#   - release: [created]  - fired automatically by release.yml, or when a release is created manually.
+#   - release: [created]  - fired automatically by release.yml (stable, from main), or manually.
+#   - push to */v*        - fired on push to prerelease branches (e.g. dev/v0.1, alpha/v1.2).
+#                           Publishes with the channel name as the npm dist-tag.
 #   - workflow_dispatch   - for manual one-off publishes.
 #
 # Package discovery:
@@ -9,8 +11,9 @@
 #   Packages listed in EXCLUDED_PACKAGES are skipped (must match the directory name).
 #
 # npm dist-tag logic:
-#   Prerelease GitHub release  -> --tag <suffix>  (e.g. v0.1.21-alpha -> --tag alpha)
-#   Stable GitHub release      -> no --tag flag   (defaults to 'latest')
+#   Push to */v* branch        -> --tag <channel>  (e.g. dev/v0.1 -> --tag dev)
+#   Prerelease GitHub release  -> --tag <suffix>   (e.g. v0.1.21-alpha -> --tag alpha)
+#   Stable GitHub release      -> no --tag flag    (defaults to 'latest')
 
 name: Publish
 
@@ -18,6 +21,9 @@ on:
   workflow_dispatch:
   release:
     types: [created]
+  push:
+    branches:
+      - '*/v*'
 
 permissions:
   contents: read
@@ -29,6 +35,8 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Do not re-run when the bot pushes the version-bump commit.
+    if: github.actor != 'github-actions[bot]'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -78,7 +86,11 @@ jobs:
       - name: Determine npm tag
         id: tag
         run: |
-          if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            # Push to */v* branch: extract channel from branch name (e.g. dev/v0.1 -> dev).
+            BRANCH="${{ github.ref_name }}"
+            echo "value=${BRANCH%%/*}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
             PKG_TAG="${{ github.event.release.tag_name }}"
             echo "value=${PKG_TAG##*-}" >> "$GITHUB_OUTPUT"
           else
