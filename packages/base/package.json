@@ -1,6 +1,6 @@
 {
   "name": "opcjs-base",
-  "version": "0.1.23-alpha",
+  "version": "0.1.24-alpha",
   "description": "Base functionalities for OPC UA.",
   "repository": {
     "type": "git",
