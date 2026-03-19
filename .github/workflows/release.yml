@@ -138,13 +138,7 @@ jobs:
         run: |
           for pkg in ${{ steps.packages.outputs.list }}; do
             ver_key="${pkg}_version"
-            # Use indirect expansion to read the output by dynamic key name.
-            new_ver=$(node -e "
-              const fs = require('fs');
-              const out = fs.readFileSync('$GITHUB_OUTPUT','utf8');
-              const m = out.match(/${ver_key}=(.+)/);
-              console.log(m ? m[1].trim() : '');
-            ")
+            new_ver=$(grep "^${ver_key}=" "$GITHUB_OUTPUT" | cut -d= -f2-)
             echo "Bumping packages/${pkg} to ${new_ver}"
             npm version "${new_ver}" --no-git-tag-version --prefix "packages/${pkg}"
           done
@@ -165,12 +159,7 @@ jobs:
           BODY="## Packages"$'\n'
           for pkg in ${{ steps.packages.outputs.list }}; do
             ver_key="${pkg}_version"
-            new_ver=$(node -e "
-              const fs = require('fs');
-              const out = fs.readFileSync('$GITHUB_OUTPUT','utf8');
-              const m = out.match(/${ver_key}=(.+)/);
-              console.log(m ? m[1].trim() : '');
-            ")
+            new_ver=$(grep "^${ver_key}=" "$GITHUB_OUTPUT" | cut -d= -f2-)
             name=$(node -p "require('./packages/${pkg}/package.json').name")
             BODY+="- \`${name}@${new_ver}\`"$'\n'
           done
