@@ -322,7 +322,7 @@ describe('Variant.newFrom - DiagnosticInfo', () => {
 
 describe('Variant.newFrom - error path', () => {
   it('throws for an unrecognised value', () => {
-    const unknown = { someRandomField: 42 }
+    const unknown: unknown = { someRandomField: 42 }
     expect(() =>
       Variant.newFrom(unknown as Parameters<typeof Variant.newFrom>[0]),
     ).toThrow(/unhandled/)

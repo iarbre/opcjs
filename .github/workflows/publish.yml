@@ -101,9 +101,11 @@ jobs:
         run: |
           for pkg in ${{ steps.packages.outputs.list }}; do
             echo "=== publishing: packages/${pkg} ==="
+            cd "packages/${pkg}"
             if [[ "${{ steps.tag.outputs.value }}" == "latest" ]]; then
-              npm publish --prefix "packages/${pkg}"
+              npm publish
             else
-              npm publish --tag "${{ steps.tag.outputs.value }}" --prefix "packages/${pkg}"
+              npm publish --tag "${{ steps.tag.outputs.value }}"
             fi
+            cd "$GITHUB_WORKSPACE"
           done

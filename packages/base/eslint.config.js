@@ -17,7 +17,7 @@ export default defineConfig(
             parserOptions: {
                 // Set the root directory for resolving tsconfig.json
                 tsconfigRootDir: path.resolve(__dirname),
-                project: ['./tsconfig.json'], // or multiple configs
+                project: ['./tsconfig.json', './tsconfig.test.json'], // or multiple configs
             },
         }
     },
