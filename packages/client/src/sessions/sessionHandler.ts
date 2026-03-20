@@ -15,6 +15,14 @@ export class SessionHandler {
         return session;
     }
 
+    /**
+     * Closes the active session on the server (OPC UA Part 4, Section 5.7.4).
+     * @param deleteSubscriptions - Forwarded to CloseSessionRequest. Defaults to true.
+     */
+    async closeSession(deleteSubscriptions = true): Promise<void> {
+        await this.sessionServices.closeSession(deleteSubscriptions)
+    }
+
     constructor(secureChannel:ISecureChannel, configuration: ConfigurationClient) {
         this.sessionServices = new SessionService(NodeId.newTwoByte(0), secureChannel, configuration);
     }

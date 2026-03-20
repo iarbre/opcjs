@@ -216,6 +216,7 @@ export class SecureChannelFacade implements ISecureChannel {
           if (response instanceof ServiceFault) {
             // A ServiceFault is the server’s error reply for one specific request.
             // Only fail that request — do not tear down all pending requests.
+            // todo: better error out, log error
             this.pending.fail(requestId, new Error(`ServiceFault: ${JSON.stringify(response)}`))
           } else {
             this.pending.settle(requestId, response)

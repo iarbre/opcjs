@@ -1,5 +1,6 @@
 import {
     ActivateSessionRequest, ActivateSessionResponse, ApplicationDescription, ApplicationTypeEnum,
+    CloseSessionRequest, CloseSessionResponse,
     Configuration, CreateSessionRequest, CreateSessionResponse, EndpointDescription, ExtensionObject,
     getLogger,
     ISecureChannel, LocalizedText, NodeId, SignatureData, SignedSoftwareCertificate, StatusCode,
@@ -132,6 +133,29 @@ export class SessionService extends ServiceBase {
         }
 
         this.logger.debug("Session activated.");
+    }
+
+    /**
+     * Closes the current session on the server (OPC UA Part 4, Section 5.7.4).
+     * @param deleteSubscriptions - When true the server deletes all Subscriptions
+     *   associated with this Session, freeing their resources immediately.
+     *   Pass false to keep Subscriptions alive for transfer to another Session.
+     */
+    async closeSession(deleteSubscriptions: boolean): Promise<void> {
+        this.logger.debug('Sending CloseSessionRequest...')
+
+        const request = new CloseSessionRequest()
+        request.requestHeader = this.createRequestHeader()
+        request.deleteSubscriptions = deleteSubscriptions
+
+        const response = await this.secureChannel.issueServiceRequest(request) as CloseSessionResponse
+
+        const result = response?.responseHeader?.serviceResult
+        if (result !== undefined && result !== StatusCode.Good) {
+            throw new Error(`CloseSession failed: ${StatusCodeToString(result)}`)
+        }
+
+        this.logger.debug('Session closed.')
     }
 
     recreate(authToken: NodeId): SessionService {

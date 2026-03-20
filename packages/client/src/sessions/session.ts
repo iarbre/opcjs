@@ -34,6 +34,15 @@ export class Session {
         return this.authToken;
     }
 
+    /**
+     * Closes the session on the server (OPC UA Part 4, Section 5.7.4).
+     * @param deleteSubscriptions - When true the server deletes all Subscriptions
+     *   tied to this Session. Defaults to true.
+     */
+    async close(deleteSubscriptions = true): Promise<void> {
+        await this.sessionServices.closeSession(deleteSubscriptions)
+    }
+
     constructor(
         public sessionId: number,
         private authToken: NodeId,

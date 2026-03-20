@@ -50,8 +50,10 @@ export class Client {
   private session?: Session
   private subscriptionHandler?: SubscriptionHandler
   private logger: ILogger
-  // Stored after connect() so that refreshSession() can recreate services.
+  // Stored after connect() so that refreshSession() and disconnect() can use them.
   private secureChannel?: ISecureChannel
+  private secureChannelFacade?: SecureChannelFacade
+  private ws?: WebSocketFascade
   private sessionHandler?: SessionHandler
 
   getSession(): Session {
@@ -160,6 +162,8 @@ export class Client {
     this.logger.debug('Creating session...')
     this.sessionHandler = new SessionHandler(sc, this.configuration)
     this.secureChannel = sc
+    this.secureChannelFacade = sc
+    this.ws = ws
     this.session = await this.sessionHandler.createNewSession(this.identity)
     this.logger.debug('Session created.')
 
@@ -167,12 +171,38 @@ export class Client {
     this.initServices()
   }
 
+  /**
+   * Gracefully disconnects from the OPC UA server.
+   *
+   * Sequence per OPC UA Part 4, Section 5.7.4:
+   * 1. CloseSession (deleteSubscriptions=true) so the server frees all resources.
+   * 2. Close the SecureChannel, which cancels the pending token-renewal timer.
+   * 3. Close the WebSocket transport.
+   *
+   * CloseSession errors are swallowed so transport teardown always completes even
+   * when the session has already expired on the server side.
+   */
   async disconnect(): Promise<void> {
-    this.logger.info("Disconnecting from OPC UA server...");
-    // Implementation of disconnection logic goes here
-    // if (this.channel) {
-    //   await this.channel.disconnect();
-    // }
+    this.logger.info('Disconnecting from OPC UA server...')
+
+    if (this.session && this.sessionHandler) {
+      try {
+        await this.sessionHandler.closeSession(true)
+      } catch (err) {
+        // Session may already be gone on the server; log and continue teardown.
+        this.logger.warn('CloseSession failed (continuing teardown):', err)
+      }
+      this.session = undefined
+    }
+
+    this.secureChannelFacade?.close()
+    this.secureChannelFacade = undefined
+    this.secureChannel = undefined
+
+    this.ws?.close()
+    this.ws = undefined
+
+    this.logger.info('Disconnected.')
   }
 
   async read(ids: NodeId[]): Promise<ReadValueResult[]> {
