@@ -41,7 +41,7 @@ export function decodeExpandedNodeId(reader: IReader): ExpandedNodeId {
     serverIndex = reader.readUInt32();
   }
 
-  return new ExpandedNodeId(nodeId.namespace, nodeId.identifier, namespaceUri, serverIndex);
+  return new ExpandedNodeId(nodeId, namespaceUri, serverIndex);
 }
 
 /**
@@ -54,9 +54,9 @@ export function encodeExpandedNodeId(writer: IWriter, value: ExpandedNodeId): vo
   if (value.serverIndex !== undefined) { extraFlags |= ExpandedNodeIdMask.ServerIndexFlag; }
 
   if (extraFlags === 0) {
-    encodeNodeId(writer, value);
+    encodeNodeId(writer, value.nodeId);
   } else {
-    encodeNodeIdWithExtraFlags(writer, value, extraFlags);
+    encodeNodeIdWithExtraFlags(writer, value.nodeId, extraFlags);
   }
 
   if (value.namespaceUri !== undefined) { writer.writeString(value.namespaceUri); }

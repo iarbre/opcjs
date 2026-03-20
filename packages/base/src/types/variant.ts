@@ -231,7 +231,6 @@ export class Variant {
     }
 
     // --- Class-based OPC UA built-in types --------------------------------
-    // ExpandedNodeId MUST be checked before NodeId because it extends NodeId.
     if (value instanceof ExpandedNodeId) {
       return new Variant(BuiltInType.ExpandedNodeId, value);
     }

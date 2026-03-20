@@ -1,4 +1,5 @@
 import { ExpandedNodeId } from "../types/expandedNodeId";
+import { NodeId } from "../types/nodeId";
 import { IOpcType } from "../types/iOpcType";
 import { IWriter } from "./interfaces/iWriter";
 
@@ -24,7 +25,7 @@ export class Encoder {
         const writer = writerFactory();
 
         const encodingId = value.getBinaryEncodingId(); // todo: this will only work for binary encoding. We have to register encoding Ids like we do for decoder
-        const eid = new ExpandedNodeId(0, encodingId);// todo: this will only work for namespace 0. I guess we need an Encoder per namespace.
+        const eid = new ExpandedNodeId(new NodeId(0, encodingId)); // todo: this will only work for namespace 0. I guess we need an Encoder per namespace.
         writer.writeExpandedNodeId(eid);
 
         const typeId = value.getTypeId();

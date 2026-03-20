@@ -204,20 +204,20 @@ describe('Variant.newFrom - NodeId', () => {
 
 // ---------------------------------------------------------------------------
 // ExpandedNodeId  (BuiltInType 18)
-// Previously broken: ExpandedNodeId extends NodeId  and its `.type` property
-// (NodeIdType enum) incorrectly matched the generic tagged-primitive branch.
+// ExpandedNodeId is no longer derived from NodeId (composition instead of
+// inheritance), so a NodeId can never accidentally be typed as ExpandedNodeId.
 // ---------------------------------------------------------------------------
 
 describe('Variant.newFrom - ExpandedNodeId', () => {
   it('ExpandedNodeId is mapped to BuiltInType.ExpandedNodeId, not NodeId', () => {
-    const id = new ExpandedNodeId(2, 123, 'http://opcfoundation.org/UA/', 0)
+    const id = new ExpandedNodeId(new NodeId(2, 123), 'http://opcfoundation.org/UA/', 0)
     const v = Variant.newFrom(id)
     expect(v.type).toBe(BuiltInType.ExpandedNodeId)
     expect(v.value).toBe(id)
   })
 
   it('ExpandedNodeId without namespace URI', () => {
-    const id = new ExpandedNodeId(0, 84)
+    const id = new ExpandedNodeId(new NodeId(0, 84))
     const v = Variant.newFrom(id)
     expect(v.type).toBe(BuiltInType.ExpandedNodeId)
   })
