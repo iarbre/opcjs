@@ -27,7 +27,7 @@ export class Decoder {
         const reader = readerFactory(data);
         const eid = reader.readExpandedNodeId();
 
-        return this.decodeWithEncodingId<T>(eid.identifier as number, reader);
+        return this.decodeWithEncodingId<T>(eid.nodeId.identifier as number, reader);
     }
 
     public decodeWithEncodingId<T extends IOpcType>(encodingId: number, reader:IReader): T {

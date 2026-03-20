@@ -263,8 +263,8 @@ export class Client {
     if (recursive) {
       for (const ref of allReferences) {
         const childNodeId = NodeId.newNumeric(
-          ref.nodeId.namespace,
-          ref.nodeId.identifier as number,
+          ref.nodeId.nodeId.namespace,
+          ref.nodeId.nodeId.identifier as number,
         );
         const childResults = await this.browseRecursive(
           childNodeId, true, visited,

@@ -9,6 +9,7 @@
  */
 
 import { NodeId } from './nodeId.js';
+import { ExpandedNodeId } from './expandedNodeId.js';
 import { IOpcType } from './iOpcType.js';
 import { ExtensionObjectEncoding } from './extensionObjectEncoding.js';
 
@@ -37,9 +38,9 @@ import { ExtensionObjectEncoding } from './extensionObjectEncoding.js';
  */
 export class ExtensionObject {
   /**
-   * The NodeId that identifies the type of structure encoded in the body.
+   * The NodeId (or ExpandedNodeId) that identifies the type of structure encoded in the body.
    */
-  public readonly typeId: NodeId;
+  public readonly typeId: NodeId | ExpandedNodeId;
 
   /**
    * The encoding used for the body.
@@ -62,7 +63,7 @@ export class ExtensionObject {
    * @param body - The encoded body (null for None encoding)
    */
   constructor(
-    typeId: NodeId,
+    typeId: NodeId | ExpandedNodeId,
     encoding: ExtensionObjectEncoding = ExtensionObjectEncoding.None,
     data?: IOpcType
   ) {
@@ -99,7 +100,7 @@ export class ExtensionObject {
    * @param body - The XML encoded body
    * @returns A new ExtensionObject with Xml encoding
    */
-  public static newXml(typeId: NodeId, data: IOpcType): ExtensionObject {
+  public static newXml(typeId: NodeId | ExpandedNodeId, data: IOpcType): ExtensionObject {
     return new ExtensionObject(typeId, ExtensionObjectEncoding.Xml, data);
   }
 }

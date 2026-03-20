@@ -57,8 +57,8 @@ export function decodeExtensionObject(reader: IReader, decoder: Decoder): Extens
  */
 export function encodeExtensionObject(writer: IWriter, value: ExtensionObject, encoder: Encoder): void {
   const typeId = value.typeId;
-  if ('namespaceUri' in typeId || 'serverIndex' in typeId) {
-    encodeExpandedNodeId(writer, typeId as ExpandedNodeId);
+  if (typeId instanceof ExpandedNodeId) {
+    encodeExpandedNodeId(writer, typeId);
   } else {
     encodeNodeId(writer, typeId);
   }
