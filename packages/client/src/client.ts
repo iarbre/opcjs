@@ -42,6 +42,14 @@ import { CallMethodResult } from './callMethodResult.js'
 import { BrowseService } from './services/browseService.js'
 import { BrowseNodeResult } from './browseNodeResult.js'
 
+/** NodeId of Server_ServerStatus (ns=0, i=2256) — a cheap server-side read used for session keep-alive. */
+const SERVER_STATUS_NODE_ID = NodeId.newNumeric(0, 2256)
+/**
+ * How often to read the server when no subscription is active (ms).
+ * Must be shorter than the server's revisedSessionTimeout (default: 60 000 ms).
+ */
+const KEEP_ALIVE_INTERVAL_MS = 25_000
+
 export class Client {
   private endpointUrl: string
   private attributeService?: AttributeService
@@ -55,6 +63,7 @@ export class Client {
   private secureChannelFacade?: SecureChannelFacade
   private ws?: WebSocketFascade
   private sessionHandler?: SessionHandler
+  private keepAliveTimer?: ReturnType<typeof setInterval>
 
   getSession(): Session {
     if (!this.session) {
@@ -101,6 +110,30 @@ export class Client {
       // Retry once with the new session.  If it fails again the error propagates.
       return await fn()
     }
+  }
+
+  /**
+   * Starts a periodic keep-alive timer that reads Server_ServerStatus when no subscription is
+   * active. OPC UA Part 4, Section 5.7.1 requires clients to keep the session alive; when no
+   * subscription Publish loop is running this is the only mechanism that does so.
+   */
+  private startKeepAlive(): void {
+    this.keepAliveTimer = setInterval(() => {
+      if (this.subscriptionHandler?.hasActiveSubscription()) {
+        // The subscription publish loop is already keeping the session alive.
+        return
+      }
+      if (this.attributeService) {
+        void this.attributeService.ReadValue([SERVER_STATUS_NODE_ID]).catch((err) => {
+          this.logger.warn('Keep-alive read failed:', err)
+        })
+      }
+    }, KEEP_ALIVE_INTERVAL_MS)
+  }
+
+  private stopKeepAlive(): void {
+    clearInterval(this.keepAliveTimer)
+    this.keepAliveTimer = undefined
   }
 
   async connect(): Promise<void> {
@@ -169,6 +202,7 @@ export class Client {
 
     this.logger.debug('Initializing services...')
     this.initServices()
+    this.startKeepAlive()
   }
 
   /**
@@ -184,6 +218,7 @@ export class Client {
    */
   async disconnect(): Promise<void> {
     this.logger.info('Disconnecting from OPC UA server...')
+    this.stopKeepAlive()
 
     if (this.session && this.sessionHandler) {
       try {

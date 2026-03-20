@@ -23,6 +23,11 @@ export class SubscriptionHandler {
     private nextHandle = 0
     private isRunning = false
 
+    /** Returns true when at least one subscription is active and the publish loop is running. */
+    hasActiveSubscription(): boolean {
+        return this.isRunning && this.entries.length > 0
+    }
+
     async subscribe(ids: NodeId[], callback: (data: { id: NodeId; value: unknown }[]) => void) {
         if (this.entries.length > 0) {
             throw new Error('Subscribing more than once is not implemented')

@@ -81,7 +81,7 @@
 ### P0 — Blocking required conformance units (must be implemented)
 
 - [x] **CloseSession** — implement `CloseSessionRequest` in `sessionService.ts` and wire into `client.disconnect()`.
-- [ ] **Session KeepAlive without subscriptions** — add a dedicated keep-alive timer that reads `Server_ServerStatus` (or a similar cheap node) at regular intervals when no subscription is active.
+- [x] **Session KeepAlive without subscriptions** — add a dedicated keep-alive timer that reads `Server_ServerStatus` (or a similar cheap node) at regular intervals when no subscription is active.
 - [ ] **Auto Reconnect – ActivateSession on existing session** — when the SecureChannel drops but the session timeout has not expired, attempt `ActivateSession` on a new channel before creating a brand-new session.
 - [ ] **Documentation – Core Capacities** — add a section to the README stating the supported number of SecureChannels, Sessions, ContinuationPoints, etc.
 - [ ] **Time Sync – OS based support (claim)** — document that the client relies on the OS system clock (NTP / systemd-timesyncd) so the "Time Sync – Support" required CU is satisfied.

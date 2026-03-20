@@ -114,4 +114,29 @@ describe('callMethod', () => {
         expect(backResult.statusCode).toBe(StatusCode.Good);
         expect(backResult.values[0]).toEqual(md5Bytes);
     });
-});
+
+    it('EchoByteString round-trips a large payload (> 66000 bytes) correctly', async () => {
+        // A payload this size forces the secure channel to split the message into
+        // multiple MSG chunks before sending.  The test verifies that chunking on
+        // the write path and chunk-reassembly on the read path both work correctly.
+        const SIZE = 70_000
+        const client = makeClient()
+        await client.connect()
+
+        const payload = new Uint8Array(SIZE)
+        for (let i = 0; i < SIZE; i++) {
+            payload[i] = i & 0xff
+        }
+
+        const result = await client.callMethod(
+            methodsObject,
+            NodeId.newString(2, 'Methods_EchoByteString'),
+            [payload])
+
+        expect(result.statusCode).toBe(StatusCode.Good)
+        expect(result.values.length).toBe(1)
+        expect(result.values[0]).toBeInstanceOf(Uint8Array)
+        expect((result.values[0] as Uint8Array).byteLength).toBe(SIZE)
+        expect(result.values[0]).toEqual(payload)
+    })
+})
