@@ -48,7 +48,9 @@ export class SecureChannelChunkWriter extends TransformStream<MsgBase, MsgBase> 
                         // Emit the N-1 intermediate chunks, each with its own sequence number.
                         for (let i = 0; i < numChunks - 1; i++) {
                             const chunkMsg = new MsgSymmetric(
-                                new MsgHeader(MsgTypeChunk, -1, msgSymmetric.header.secureChannelId),
+                                // messageSize=0 is a placeholder: MsgBase.Encrypt() overwrites it at byte offset 4
+                                // with the actual encrypted size before writing to the wire.
+                                new MsgHeader(MsgTypeChunk, 0, msgSymmetric.header.secureChannelId),
                                 msgSymmetric.securityHeader,
                                 new MsgSequenceHeader(
                                     this.context.nextSequenceNumber(),

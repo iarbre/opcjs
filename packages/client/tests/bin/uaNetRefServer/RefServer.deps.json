@@ -11,9 +11,9 @@
           "Microsoft.IdentityModel.Protocols.OpenIdConnect": "8.15.0",
           "Microsoft.IdentityModel.Tokens": "8.15.0",
           "Mono.Options": "6.12.0.148",
-          "OPCFoundation.NetStandard.Opc.Ua.Core.Debug": "1.5.374-preview-20260319",
-          "OPCFoundation.NetStandard.Opc.Ua.Server.Debug": "1.5.374-preview-20260319",
-          "OPCFoundation.NetStandard.Opc.Ua.Types.Debug": "1.5.374-preview-20260319",
+          "OPCFoundation.NetStandard.Opc.Ua.Core.Debug": "1.5.374-preview-20260320",
+          "OPCFoundation.NetStandard.Opc.Ua.Server.Debug": "1.5.374-preview-20260320",
+          "OPCFoundation.NetStandard.Opc.Ua.Types.Debug": "1.5.374-preview-20260320",
           "Serilog": "4.3.0",
           "Serilog.Expressions": "5.0.0",
           "Serilog.Extensions.Logging": "10.0.0",
@@ -186,9 +186,9 @@
           }
         }
       },
-      "OPCFoundation.NetStandard.Opc.Ua.Configuration.Debug/1.5.374-preview-20260319": {
+      "OPCFoundation.NetStandard.Opc.Ua.Configuration.Debug/1.5.374-preview-20260320": {
         "dependencies": {
-          "OPCFoundation.NetStandard.Opc.Ua.Core.Debug": "1.5.374-preview-20260319"
+          "OPCFoundation.NetStandard.Opc.Ua.Core.Debug": "1.5.374-preview-20260320"
         },
         "runtime": {
           "Opc.Ua.Configuration.dll": {
@@ -197,11 +197,11 @@
           }
         }
       },
-      "OPCFoundation.NetStandard.Opc.Ua.Core.Debug/1.5.374-preview-20260319": {
+      "OPCFoundation.NetStandard.Opc.Ua.Core.Debug/1.5.374-preview-20260320": {
         "dependencies": {
           "Newtonsoft.Json": "13.0.4",
-          "OPCFoundation.NetStandard.Opc.Ua.Security.Certificates.Debug": "1.5.374-preview-20260319",
-          "OPCFoundation.NetStandard.Opc.Ua.Types.Debug": "1.5.374-preview-20260319"
+          "OPCFoundation.NetStandard.Opc.Ua.Security.Certificates.Debug": "1.5.374-preview-20260320",
+          "OPCFoundation.NetStandard.Opc.Ua.Types.Debug": "1.5.374-preview-20260320"
         },
         "runtime": {
           "Opc.Ua.Core.dll": {
@@ -210,9 +210,9 @@
           }
         }
       },
-      "OPCFoundation.NetStandard.Opc.Ua.Security.Certificates.Debug/1.5.374-preview-20260319": {
+      "OPCFoundation.NetStandard.Opc.Ua.Security.Certificates.Debug/1.5.374-preview-20260320": {
         "dependencies": {
-          "OPCFoundation.NetStandard.Opc.Ua.Types.Debug": "1.5.374-preview-20260319"
+          "OPCFoundation.NetStandard.Opc.Ua.Types.Debug": "1.5.374-preview-20260320"
         },
         "runtime": {
           "Opc.Ua.Security.Certificates.dll": {
@@ -221,10 +221,10 @@
           }
         }
       },
-      "OPCFoundation.NetStandard.Opc.Ua.Server.Debug/1.5.374-preview-20260319": {
+      "OPCFoundation.NetStandard.Opc.Ua.Server.Debug/1.5.374-preview-20260320": {
         "dependencies": {
-          "OPCFoundation.NetStandard.Opc.Ua.Configuration.Debug": "1.5.374-preview-20260319",
-          "OPCFoundation.NetStandard.Opc.Ua.Core.Debug": "1.5.374-preview-20260319"
+          "OPCFoundation.NetStandard.Opc.Ua.Configuration.Debug": "1.5.374-preview-20260320",
+          "OPCFoundation.NetStandard.Opc.Ua.Core.Debug": "1.5.374-preview-20260320"
         },
         "runtime": {
           "Opc.Ua.Server.dll": {
@@ -233,7 +233,7 @@
           }
         }
       },
-      "OPCFoundation.NetStandard.Opc.Ua.Types.Debug/1.5.374-preview-20260319": {
+      "OPCFoundation.NetStandard.Opc.Ua.Types.Debug/1.5.374-preview-20260320": {
         "runtime": {
           "Opc.Ua.Types.dll": {
             "assemblyVersion": "1.5.0.0",
@@ -243,9 +243,9 @@
       },
       "UaWebSocket/1.0.0": {
         "dependencies": {
-          "OPCFoundation.NetStandard.Opc.Ua.Core.Debug": "1.5.374-preview-20260319",
-          "OPCFoundation.NetStandard.Opc.Ua.Security.Certificates.Debug": "1.5.374-preview-20260319",
-          "OPCFoundation.NetStandard.Opc.Ua.Types.Debug": "1.5.374-preview-20260319"
+          "OPCFoundation.NetStandard.Opc.Ua.Core.Debug": "1.5.374-preview-20260320",
+          "OPCFoundation.NetStandard.Opc.Ua.Security.Certificates.Debug": "1.5.374-preview-20260320",
+          "OPCFoundation.NetStandard.Opc.Ua.Types.Debug": "1.5.374-preview-20260320"
         },
         "runtime": {
           "UaWebSocket.dll": {
@@ -407,27 +407,27 @@
       "path": "system.identitymodel.tokens.jwt/8.15.0",
       "hashPath": "system.identitymodel.tokens.jwt.8.15.0.nupkg.sha512"
     },
-    "OPCFoundation.NetStandard.Opc.Ua.Configuration.Debug/1.5.374-preview-20260319": {
+    "OPCFoundation.NetStandard.Opc.Ua.Configuration.Debug/1.5.374-preview-20260320": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "OPCFoundation.NetStandard.Opc.Ua.Core.Debug/1.5.374-preview-20260319": {
+    "OPCFoundation.NetStandard.Opc.Ua.Core.Debug/1.5.374-preview-20260320": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "OPCFoundation.NetStandard.Opc.Ua.Security.Certificates.Debug/1.5.374-preview-20260319": {
+    "OPCFoundation.NetStandard.Opc.Ua.Security.Certificates.Debug/1.5.374-preview-20260320": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "OPCFoundation.NetStandard.Opc.Ua.Server.Debug/1.5.374-preview-20260319": {
+    "OPCFoundation.NetStandard.Opc.Ua.Server.Debug/1.5.374-preview-20260320": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "OPCFoundation.NetStandard.Opc.Ua.Types.Debug/1.5.374-preview-20260319": {
+    "OPCFoundation.NetStandard.Opc.Ua.Types.Debug/1.5.374-preview-20260320": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
