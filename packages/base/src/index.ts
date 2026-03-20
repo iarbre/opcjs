@@ -55,7 +55,7 @@ export { TcpConnectionHandler } from './transports/ws/tcpConnectionHandler.js';
 export { SecureChannelFacade } from './secureChannel/secureChannelFacade.js';
 export { SecureChannelContext } from './secureChannel/secureChannelContext.js';
 export { SecureChannelMessageDecoder } from './secureChannel/secureChannelMessageDecoder.js';
-export { SecureChannelMesssageEncoder } from './secureChannel/secureChannelMessageEncoder.js';
+export { SecureChannelMessageEncoder } from './secureChannel/secureChannelMessageEncoder.js';
 export { SecureChannelTypeDecoder } from './secureChannel/secureChannelTypeDecoder.js';
 export { SecureChannelTypeEncoder } from './secureChannel/secureChannelTypeEncoder.js';
 export {SecureChannelChunkReader} from './secureChannel/secureChannelChunkReader.js';

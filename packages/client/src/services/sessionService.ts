@@ -57,25 +57,46 @@ export class SessionService extends ServiceBase {
             throw new Error(`CreateSessionRequest failed: ${StatusCodeToString(serviceResult)}`);
         }
 
-        const endpoint = 'opc.' + this.secureChannel.getEndpointUrl();
-        const endpointUrl = new URL(endpoint);
-        const securityMode = this.secureChannel.getSecurityMode();
-        const securityPolicyUri = this.secureChannel.getSecurityPolicy(); // todo: does not work with localhost. Not sure why.
+        // The URL the client actually used to connect.  Prepend the OPC UA scheme
+        // prefix so it is parseable by the standard URL constructor.
+        const clientConnectionUrl = new URL('opc.' + this.secureChannel.getEndpointUrl())
+        const securityMode = this.secureChannel.getSecurityMode()
+        const securityPolicyUri = this.secureChannel.getSecurityPolicy()
 
-        const serverEndpoint = castedResponse
-            ?.serverEndpoints
-            ?.find(currentEndpoint => {
-                const currentEndpointUrl = new URL(currentEndpoint.endpointUrl as string);
+        // OPC UA Part 4, Section 5.4.4.2: Clients should be prepared to replace
+        // the HostName and port returned in the EndpointDescription with the
+        // HostName or IP address and port they used to call GetEndpoints. This
+        // handles NAT/load-balancer scenarios where the server advertises internal
+        // addresses that are unreachable by the client.
+        const normalizeEndpointUrl = (serverEndpointUrl: string): URL => {
+            const url = new URL(serverEndpointUrl)
+            url.hostname = clientConnectionUrl.hostname
+            url.port = clientConnectionUrl.port
+            return url
+        }
 
-                return currentEndpointUrl.protocol === endpointUrl.protocol
-                && currentEndpointUrl.pathname === endpointUrl.pathname
-                && currentEndpointUrl.port === endpointUrl.port
+        // Match on protocol and path only; host and port are normalized away so
+        // that internally-addressed endpoints are still found.
+        const serverEndpoint = castedResponse?.serverEndpoints?.find(currentEndpoint => {
+            const normalized = normalizeEndpointUrl(currentEndpoint.endpointUrl as string)
+            return normalized.protocol === clientConnectionUrl.protocol
+                && normalized.pathname === clientConnectionUrl.pathname
                 && currentEndpoint.securityMode === securityMode
-                && currentEndpoint.securityPolicyUri === securityPolicyUri});
+                && currentEndpoint.securityPolicyUri === securityPolicyUri
+        })
 
         if (!serverEndpoint) {
-            throw new Error(`Server endpoint ${endpoint} not found in CreateSessionResponse`);
+            throw new Error(`Server endpoint ${clientConnectionUrl.toString()} not found in CreateSessionResponse`)
         }
+
+        // Replace the server-reported host and port with the client's actual
+        // connection address so downstream code uses the correct URL.
+        serverEndpoint.endpointUrl = normalizeEndpointUrl(serverEndpoint.endpointUrl as string).toString()
+
+        // NOTE: per OPC UA Part 4, Section 5.4.4.2 the client shall still verify
+        // the HostName it used to open the SecureChannel against the HostName list
+        // in the Server Certificate.  This is deferred until certificate-based
+        // security (non-None SecurityPolicy) is implemented.
 
         this.logger.debug("Session created with id:", castedResponse.sessionId.identifier);
         return {

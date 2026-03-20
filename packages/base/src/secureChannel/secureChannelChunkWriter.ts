@@ -3,6 +3,7 @@ import { getLogger } from "../utils/logger/loggerProvider";
 import { MsgBase } from "./messages/msgBase";
 import { MsgHeader } from "./messages/msgHeader";
 import { MsgSecurityHeaderSymmetric } from "./messages/msgSecurityHeaderSymmetric";
+import { MsgSequenceHeader } from "./messages/msgSequenceHeader";
 import { MsgSymmetric } from "./messages/msgSymmetric";
 import {
     MsgTypeChunk,
@@ -24,50 +25,66 @@ export class SecureChannelChunkWriter extends TransformStream<MsgBase, MsgBase> 
             switch (msg.header.msgType) {
 
                 case MsgTypeFinal: {
-                    this.logger.debug("Received Final message");;
+                    this.logger.debug("Received Final message");
 
-                    const securityAlgorithm = this.context.securityAlgorithm!;
-                    const maxCipherTextSize = this.context.maxSendBufferSize - MsgHeader.Size - MsgSecurityHeaderSymmetric.Size;
-                    const maxPlainTextSize = maxCipherTextSize / securityAlgorithm.GetEncryptedSize(maxCipherTextSize);
-                    const maxPayloadSize = maxPlainTextSize
-                        - securityAlgorithm.GetSignatureLength()
-                        - 1
-                        - MsgSecurityHeaderSymmetric.Size
-                        + (securityAlgorithm.IsAuthenticated() ? 1 : 0);
+                    const securityAlgorithm = this.context.securityAlgorithm!
 
-                    const data = msgSymmetric.body as Uint8Array;
-                    const chunkCount = data.byteLength / maxPayloadSize;
-                    if (chunkCount > 1) {
-                        this.logger.debug(`Message body exceeds max chunk size, splitting into ${chunkCount} chunks.`);
-                        for (let i = 0; i < chunkCount; i++) {
+                    // Available ciphertext space after fixed message framing.
+                    const maxCipherTextSize =
+                        this.context.maxSendBufferSize - MsgHeader.Size - MsgSecurityHeaderSymmetric.Size
+
+                    // Convert to max payload per chunk: GetMaxPayload handles the
+                    // cipher-block/padding/signature overhead; subtract the sequence
+                    // header that sits in front of every chunk body.
+                    const maxPayloadSize =
+                        securityAlgorithm.GetMaxPayload(maxCipherTextSize) - MsgSequenceHeader.Size
+
+                    const data = msgSymmetric.body as Uint8Array
+                    const numChunks = Math.ceil(data.byteLength / maxPayloadSize)
+
+                    if (numChunks > 1) {
+                        this.logger.debug(`Message body exceeds max chunk size, splitting into ${numChunks} chunks.`)
+
+                        // Emit the N-1 intermediate chunks, each with its own sequence number.
+                        for (let i = 0; i < numChunks - 1; i++) {
                             const chunkMsg = new MsgSymmetric(
                                 new MsgHeader(MsgTypeChunk, -1, msgSymmetric.header.secureChannelId),
                                 msgSymmetric.securityHeader,
-                                msgSymmetric.sequenceHeader,
-                                data.subarray(i * maxPayloadSize, (i + 1) * maxPayloadSize)
-                            );
-
-                            this.logger.trace(`Enqueuing chunk ${i + 1}/${chunkCount} with size ${(chunkMsg.body as Uint8Array).byteLength} bytes.`);
-                            controller.enqueue(chunkMsg);
+                                new MsgSequenceHeader(
+                                    this.context.nextSequenceNumber(),
+                                    msgSymmetric.sequenceHeader.requestId,
+                                ),
+                                data.subarray(i * maxPayloadSize, (i + 1) * maxPayloadSize),
+                            )
+                            this.logger.trace(
+                                `Enqueuing chunk ${i + 1}/${numChunks} with size ${(chunkMsg.body as Uint8Array).byteLength} bytes.`,
+                            )
+                            controller.enqueue(chunkMsg)
                         }
-                        msg.body = data.subarray(chunkCount * maxPayloadSize);
+
+                        // Update the final message to carry the last slice with a fresh sequence number.
+                        msg.sequenceHeader = new MsgSequenceHeader(
+                            this.context.nextSequenceNumber(),
+                            msgSymmetric.sequenceHeader.requestId,
+                        )
+                        msg.body = data.subarray((numChunks - 1) * maxPayloadSize)
                     }
 
-                    break;
+                    break
                 }
 
                 default:
-                    break;
+                    break
             }
         }
 
-        this.logger.trace(`Enqueuing message default message with body size ${(msg.body as Uint8Array).byteLength} bytes.`);
-        controller.enqueue(msg);
+        this.logger.trace(`Enqueuing final message with body size ${(msg.body as Uint8Array).byteLength} bytes.`)
+        controller.enqueue(msg)
     }
 
     constructor(private context: SecureChannelContext) {
         super({
             transform: (data, controller) => this.transform(data, controller),
-        });
+        })
     }
 }

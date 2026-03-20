@@ -1,6 +1,10 @@
-export const MsgTypeOpenFinal   = 'O'.charCodeAt(0) | 'P'.charCodeAt(0)<<8 | 'N'.charCodeAt(0)<<16 | 'F'.charCodeAt(0)<<24
-export const MsgTypeAbort    = 'M'.charCodeAt(0) | 'S'.charCodeAt(0)<<8 | 'G'.charCodeAt(0)<<16 | 'A'.charCodeAt(0)<<24
-export const MsgTypeChunk    = 'M'.charCodeAt(0) | 'S'.charCodeAt(0)<<8 | 'G'.charCodeAt(0)<<16 | 'C'.charCodeAt(0)<<24
-export const MsgTypeFinal    = 'M'.charCodeAt(0) | 'S'.charCodeAt(0)<<8 | 'G'.charCodeAt(0)<<16 | 'F'.charCodeAt(0)<<24
-export const MsgTypeCloseFinal  = 'C'.charCodeAt(0) | 'L'.charCodeAt(0)<<8 | 'O'.charCodeAt(0)<<16 | 'F'.charCodeAt(0)<<24
-export type MsgType = number;
+export const MsgTypeOpenFinal    = 'O'.charCodeAt(0) | 'P'.charCodeAt(0)<<8 | 'N'.charCodeAt(0)<<16 | 'F'.charCodeAt(0)<<24
+export const MsgTypeOpenChunk    = 'O'.charCodeAt(0) | 'P'.charCodeAt(0)<<8 | 'N'.charCodeAt(0)<<16 | 'C'.charCodeAt(0)<<24
+export const MsgTypeOpenAbort    = 'O'.charCodeAt(0) | 'P'.charCodeAt(0)<<8 | 'N'.charCodeAt(0)<<16 | 'A'.charCodeAt(0)<<24
+export const MsgTypeAbort        = 'M'.charCodeAt(0) | 'S'.charCodeAt(0)<<8 | 'G'.charCodeAt(0)<<16 | 'A'.charCodeAt(0)<<24
+export const MsgTypeChunk        = 'M'.charCodeAt(0) | 'S'.charCodeAt(0)<<8 | 'G'.charCodeAt(0)<<16 | 'C'.charCodeAt(0)<<24
+export const MsgTypeFinal        = 'M'.charCodeAt(0) | 'S'.charCodeAt(0)<<8 | 'G'.charCodeAt(0)<<16 | 'F'.charCodeAt(0)<<24
+export const MsgTypeCloseFinal   = 'C'.charCodeAt(0) | 'L'.charCodeAt(0)<<8 | 'O'.charCodeAt(0)<<16 | 'F'.charCodeAt(0)<<24
+export const MsgTypeCloseChunk   = 'C'.charCodeAt(0) | 'L'.charCodeAt(0)<<8 | 'O'.charCodeAt(0)<<16 | 'C'.charCodeAt(0)<<24
+export const MsgTypeCloseAbort   = 'C'.charCodeAt(0) | 'L'.charCodeAt(0)<<8 | 'O'.charCodeAt(0)<<16 | 'A'.charCodeAt(0)<<24
+export type MsgType = number
