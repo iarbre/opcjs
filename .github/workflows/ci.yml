@@ -1,0 +1,135 @@
+# Release workflow — manually triggered to create a GitHub release and publish packages to npm.
+#
+# Run this after the CI workflow has built and bumped versions on the target branch.
+#
+# Inputs:
+#   ref  - Branch to release from (e.g. 'main' for stable, 'alpha/v0.1' for prerelease).
+#          The version already in each package.json on that branch is used as-is.
+#
+# npm dist-tag logic:
+#   ref = main    -> --tag latest  (stable)
+#   ref = */v*    -> --tag <channel>  (e.g. alpha/v0.1 -> --tag alpha)
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch to release from (e.g. main, alpha/v0.1)'
+        required: true
+        default: 'main'
+
+permissions:
+  contents: write
+  id-token: write   # REQUIRED for trusted npm publishing
+
+env:
+  EXCLUDED_PACKAGES: generator
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 'lts/*'
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Discover publishable packages
+        id: packages
+        run: |
+          DIRS=()
+          for pkg in packages/*/; do
+            name=$(basename "$pkg")
+            if echo " $EXCLUDED_PACKAGES " | grep -qw "$name"; then
+              echo "Skipping excluded package: $name"
+              continue
+            fi
+            if ! node -e "const p=require('./${pkg}package.json'); process.exit(p.scripts&&p.scripts.prepublish?0:1)" 2>/dev/null; then
+              echo "Skipping package without prepublish script: $name"
+              continue
+            fi
+            DIRS+=("$name")
+            echo "Found publishable package: $name"
+          done
+          echo "list=${DIRS[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: |
+          for pkg in ${{ steps.packages.outputs.list }}; do
+            echo "=== build: packages/${pkg} ==="
+            npm run prepublish --prefix "packages/${pkg}"
+          done
+
+      - name: Determine release metadata
+        id: meta
+        run: |
+          REF="${{ inputs.ref }}"
+          if [[ "$REF" == "main" ]]; then
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            # e.g. alpha/v0.1 -> channel = alpha
+            CHANNEL="${REF%%/*}"
+            echo "npm_tag=${CHANNEL}" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+          # Use the base package version as the release tag.
+          VERSION=$(node -p "require('./packages/base/package.json').version")
+          echo "release_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release body
+        id: body
+        run: |
+          BODY="## Packages"$'\n'
+          for pkg in ${{ steps.packages.outputs.list }}; do
+            name=$(node -p "require('./packages/${pkg}/package.json').name")
+            version=$(node -p "require('./packages/${pkg}/package.json').version")
+            BODY+="- \`${name}@${version}\`"$'\n'
+          done
+          {
+            echo "text<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name:               ${{ steps.meta.outputs.release_tag }}
+          name:                   ${{ steps.meta.outputs.release_tag }}
+          prerelease:             ${{ steps.meta.outputs.is_prerelease }}
+          generate_release_notes: true
+          body:                   ${{ steps.body.outputs.text }}
+          target_commitish:       ${{ inputs.ref }}
+
+      - name: Publish all packages to npm
+        run: |
+          for pkg in ${{ steps.packages.outputs.list }}; do
+            echo "=== publishing: packages/${pkg} ==="
+            cd "packages/${pkg}"
+            if [[ "${{ steps.meta.outputs.npm_tag }}" == "latest" ]]; then
+              npm publish
+            else
+              npm publish --tag "${{ steps.meta.outputs.npm_tag }}"
+            fi
+            cd "$GITHUB_WORKSPACE"
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,24 +1,17 @@
-# Automated release workflow.
+# CI workflow — runs on every push to main and prerelease branches.
 #
-# Triggers on:
-#   - push to main                          -> stable release, no prerelease suffix, npm tag: latest
-#   - push to <channel>/v<major>.<minor>    -> prerelease, suffix = channel, npm tag = channel
-#       e.g.  alpha/v0.1,  beta/v1.2,  dev/v0.3
+# Steps:
+#   1. Discover all publishable packages (have a "prepublish" script, not in EXCLUDED_PACKAGES).
+#   2. Build (prepublish) all packages.
+#   3. Run unit tests.
+#   4. Compute and bump the next semver for each package:
+#        main branch:           patch bump, no prerelease suffix.
+#        <channel>/v<M>.<m>:    patch bump with -<channel> suffix.
+#   5. Commit and push the bumped package.json files.
 #
-# Flow:
-#   1. Discover all publishable packages (packages/* that have a "prepublish" script,
-#      excluding packages listed in EXCLUDED_PACKAGES).
-#   2. Run "npm run prepublish" for each discovered package.
-#   3. Compute the next semver for each package:
-#        main branch:           bump patch, no prerelease suffix.
-#        <channel>/v<M>.<m>:    same M.m -> bump patch; different -> reset to 0. Append -<channel>.
-#   4. Commit all updated package.json files with [skip ci] and push.
-#   5. Create a GitHub release (prerelease=false on main, prerelease=true otherwise).
-#
-# The publish workflow (publish.yml) fires automatically on release: [created]
-# and publishes all discovered packages to npm.
+# To publish a release, trigger the Release workflow manually.
 
-name: Release
+name: CI
 
 on:
   push:
@@ -30,11 +23,10 @@ permissions:
   contents: write
 
 env:
-  # Space-separated list of package directory names to skip (not published).
   EXCLUDED_PACKAGES: generator
 
 jobs:
-  prepare:
+  ci:
     runs-on: ubuntu-latest
     # Do not re-run when the bot pushes the version-bump commit.
     if: github.actor != 'github-actions[bot]'
@@ -59,12 +51,10 @@ jobs:
           DIRS=()
           for pkg in packages/*/; do
             name=$(basename "$pkg")
-            # Skip excluded packages.
             if echo " $EXCLUDED_PACKAGES " | grep -qw "$name"; then
               echo "Skipping excluded package: $name"
               continue
             fi
-            # Skip packages without a "prepublish" script.
             if ! node -e "const p=require('./${pkg}package.json'); process.exit(p.scripts&&p.scripts.prepublish?0:1)" 2>/dev/null; then
               echo "Skipping package without prepublish script: $name"
               continue
@@ -72,11 +62,26 @@ jobs:
             DIRS+=("$name")
             echo "Found publishable package: $name"
           done
-          # Space-separated list used by subsequent steps.
           echo "list=${DIRS[*]}" >> "$GITHUB_OUTPUT"
 
-      - name: Install dependencies for all packages
+      - name: Install dependencies
         run: npm ci
+
+      - name: Build all packages
+        run: |
+          for pkg in ${{ steps.packages.outputs.list }}; do
+            echo "=== build: packages/${pkg} ==="
+            npm run prepublish --prefix "packages/${pkg}"
+          done
+
+      - name: Run tests
+        run: |
+          for pkg in ${{ steps.packages.outputs.list }}; do
+            echo "=== test: packages/${pkg} ==="
+            cd "packages/${pkg}"
+            OPCUA_EXTERNAL_SERVER=1 npx vitest run
+            cd "$GITHUB_WORKSPACE"
+          done
 
       - name: Compute new versions
         id: version
@@ -90,7 +95,6 @@ jobs:
             echo "${current%%-*}"
           }
 
-          # Workspace file for sharing versions with later steps.
           VERSIONS_FILE="$GITHUB_WORKSPACE/.versions.env"
           > "$VERSIONS_FILE"
 
@@ -102,12 +106,7 @@ jobs:
               patch=$(echo "$stripped" | cut -d. -f3)
               patch="${patch:-0}"
               new_ver="${major}.${minor}.$((patch + 1))"
-              echo "${pkg}_version=${new_ver}" >> "$GITHUB_OUTPUT"
               echo "${pkg}_version=${new_ver}" >> "$VERSIONS_FILE"
-              # Use base package to derive the release tag.
-              if [[ "$pkg" == "base" ]]; then
-                echo "release_tag=v${new_ver}" >> "$GITHUB_OUTPUT"
-              fi
             done
           else
             NPM_CHANNEL="${BRANCH%%/*}"
@@ -125,11 +124,7 @@ jobs:
               else
                 new_ver="${BRANCH_MAJOR}.${BRANCH_MINOR}.0-${NPM_CHANNEL}"
               fi
-              echo "${pkg}_version=${new_ver}" >> "$GITHUB_OUTPUT"
               echo "${pkg}_version=${new_ver}" >> "$VERSIONS_FILE"
-              if [[ "$pkg" == "base" ]]; then
-                echo "release_tag=v${new_ver}" >> "$GITHUB_OUTPUT"
-              fi
             done
           fi
 
@@ -152,31 +147,3 @@ jobs:
           done
           git commit -m "chore: bump package versions [skip ci]"
           git push
-
-      - name: Build release body
-        id: body
-        run: |
-          source "$GITHUB_WORKSPACE/.versions.env"
-          BODY="## Packages"$'\n'
-          for pkg in ${{ steps.packages.outputs.list }}; do
-            ver_key="${pkg}_version"
-            new_ver="${!ver_key}"
-            name=$(node -p "require('./packages/${pkg}/package.json').name")
-            BODY+="- \`${name}@${new_ver}\`"$'\n'
-          done
-          # Write multi-line output safely.
-          {
-            echo "text<<EOF"
-            echo "$BODY"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name:               ${{ steps.version.outputs.release_tag }}
-          name:                   ${{ steps.version.outputs.release_tag }}
-          prerelease:             ${{ github.ref_name != 'main' }}
-          generate_release_notes: true
-          body:                   ${{ steps.body.outputs.text }}
-
