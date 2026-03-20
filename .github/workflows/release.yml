@@ -1,39 +1,41 @@
-# CI workflow — runs on every push to main and prerelease branches.
+# Release workflow — manually triggered to create a GitHub release and publish packages to npm.
 #
-# Steps:
-#   1. Discover all publishable packages (have a "prepublish" script, not in EXCLUDED_PACKAGES).
-#   2. Build (prepublish) all packages.
-#   3. Run unit tests.
-#   4. Compute and bump the next semver for each package:
-#        main branch:           patch bump, no prerelease suffix.
-#        <channel>/v<M>.<m>:    patch bump with -<channel> suffix.
-#   5. Commit and push the bumped package.json files.
+# Run this after the CI workflow has built and bumped versions on the target branch.
 #
-# To publish a release, trigger the Release workflow manually.
+# Inputs:
+#   ref  - Branch to release from (e.g. 'main' for stable, 'alpha/v0.1' for prerelease).
+#          The version already in each package.json on that branch is used as-is.
+#
+# npm dist-tag logic:
+#   ref = main    -> --tag latest  (stable)
+#   ref = */v*    -> --tag <channel>  (e.g. alpha/v0.1 -> --tag alpha)
 
-name: CI
+name: Release
 
 on:
-  push:
-    branches:
-      - main
-      - '*/v*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch to release from (e.g. main, alpha/v0.1)'
+        required: true
+        default: 'main'
 
 permissions:
   contents: write
+  id-token: write   # REQUIRED for trusted npm publishing
 
 env:
   EXCLUDED_PACKAGES: generator
 
 jobs:
-  ci:
+  release:
     runs-on: ubuntu-latest
-    # Do not re-run when the bot pushes the version-bump commit.
-    if: github.actor != 'github-actions[bot]'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -44,6 +46,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 'lts/*'
+          registry-url: 'https://registry.npmjs.org/'
 
       - name: Discover publishable packages
         id: packages
@@ -74,76 +77,59 @@ jobs:
             npm run prepublish --prefix "packages/${pkg}"
           done
 
-      - name: Run tests
+      - name: Determine release metadata
+        id: meta
+        run: |
+          REF="${{ inputs.ref }}"
+          if [[ "$REF" == "main" ]]; then
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            # e.g. alpha/v0.1 -> channel = alpha
+            CHANNEL="${REF%%/*}"
+            echo "npm_tag=${CHANNEL}" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+          # Use the base package version as the release tag.
+          VERSION=$(node -p "require('./packages/base/package.json').version")
+          echo "release_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release body
+        id: body
+        run: |
+          BODY="## Packages"$'\n'
+          for pkg in ${{ steps.packages.outputs.list }}; do
+            name=$(node -p "require('./packages/${pkg}/package.json').name")
+            version=$(node -p "require('./packages/${pkg}/package.json').version")
+            BODY+="- \`${name}@${version}\`"$'\n'
+          done
+          {
+            echo "text<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name:               ${{ steps.meta.outputs.release_tag }}
+          name:                   ${{ steps.meta.outputs.release_tag }}
+          prerelease:             ${{ steps.meta.outputs.is_prerelease }}
+          generate_release_notes: true
+          body:                   ${{ steps.body.outputs.text }}
+          target_commitish:       ${{ inputs.ref }}
+
+      - name: Publish all packages to npm
         run: |
           for pkg in ${{ steps.packages.outputs.list }}; do
-            echo "=== test: packages/${pkg} ==="
+            echo "=== publishing: packages/${pkg} ==="
             cd "packages/${pkg}"
-            OPCUA_EXTERNAL_SERVER=1 npx vitest run
+            if [[ "${{ steps.meta.outputs.npm_tag }}" == "latest" ]]; then
+              npm publish
+            else
+              npm publish --tag "${{ steps.meta.outputs.npm_tag }}"
+            fi
             cd "$GITHUB_WORKSPACE"
           done
-
-      - name: Compute new versions
-        id: version
-        run: |
-          BRANCH="${{ github.ref_name }}"
-          PACKAGES="${{ steps.packages.outputs.list }}"
-
-          read_stripped() {
-            local pkgfile="$1" current
-            current=$(node -p "require('./${pkgfile}').version")
-            echo "${current%%-*}"
-          }
-
-          VERSIONS_FILE="$GITHUB_WORKSPACE/.versions.env"
-          > "$VERSIONS_FILE"
-
-          if [[ "$BRANCH" == "main" ]]; then
-            for pkg in $PACKAGES; do
-              stripped=$(read_stripped "packages/${pkg}/package.json")
-              major=$(echo "$stripped" | cut -d. -f1)
-              minor=$(echo "$stripped" | cut -d. -f2)
-              patch=$(echo "$stripped" | cut -d. -f3)
-              patch="${patch:-0}"
-              new_ver="${major}.${minor}.$((patch + 1))"
-              echo "${pkg}_version=${new_ver}" >> "$VERSIONS_FILE"
-            done
-          else
-            NPM_CHANNEL="${BRANCH%%/*}"
-            VER_PART="${BRANCH#*/v}"
-            BRANCH_MAJOR="${VER_PART%%.*}"
-            BRANCH_MINOR="${VER_PART#*.}"
-            for pkg in $PACKAGES; do
-              stripped=$(read_stripped "packages/${pkg}/package.json")
-              pkg_major=$(echo "$stripped" | cut -d. -f1)
-              pkg_minor=$(echo "$stripped" | cut -d. -f2)
-              pkg_patch=$(echo "$stripped" | cut -d. -f3)
-              pkg_patch="${pkg_patch:-0}"
-              if [[ "$pkg_major" == "$BRANCH_MAJOR" && "$pkg_minor" == "$BRANCH_MINOR" ]]; then
-                new_ver="${BRANCH_MAJOR}.${BRANCH_MINOR}.$((pkg_patch + 1))-${NPM_CHANNEL}"
-              else
-                new_ver="${BRANCH_MAJOR}.${BRANCH_MINOR}.0-${NPM_CHANNEL}"
-              fi
-              echo "${pkg}_version=${new_ver}" >> "$VERSIONS_FILE"
-            done
-          fi
-
-      - name: Bump versions in all package.json files
-        run: |
-          source "$GITHUB_WORKSPACE/.versions.env"
-          for pkg in ${{ steps.packages.outputs.list }}; do
-            ver_key="${pkg}_version"
-            new_ver="${!ver_key}"
-            echo "Bumping packages/${pkg} to ${new_ver}"
-            npm version "${new_ver}" --no-git-tag-version --prefix "packages/${pkg}"
-          done
-
-      - name: Commit and push version bumps
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          for pkg in ${{ steps.packages.outputs.list }}; do
-            git add "packages/${pkg}/package.json"
-          done
-          git commit -m "chore: bump package versions [skip ci]"
-          git push
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
