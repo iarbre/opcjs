@@ -18,7 +18,7 @@ import { SecureChannelContext } from "./secureChannelContext";
  *   .pipeTo(wsSendable);
  * ```
  */
-export class SecureChannelMesssageEncoder extends TransformStream<MsgBase, Uint8Array> {
+export class SecureChannelMessageEncoder extends TransformStream<MsgBase, Uint8Array> {
   constructor(context: SecureChannelContext) {
     super({
       transform(msg, controller) {

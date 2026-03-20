@@ -3,54 +3,63 @@ import { MsgBase } from "./messages/msgBase";
 import {
   MsgTypeChunk,
   MsgTypeFinal,
+  MsgTypeOpenChunk,
+  MsgTypeOpenFinal,
 } from "./messages/msgType";
 import { SecureChannelContext } from "./secureChannelContext";
 
 export class SecureChannelChunkReader extends TransformStream<MsgBase, MsgBase> {
-    private logger = getLogger("secureChannel.SecureChannelChunkReader");
-
-  private prependChunk(chunk: Uint8Array, body: Uint8Array): Uint8Array {
-    const result = new Uint8Array(chunk.byteLength + body.byteLength);
-    result.set(chunk, 0);
-    result.set(body, chunk.byteLength);
-    return result;
-  }
+  private logger = getLogger("secureChannel.SecureChannelChunkReader");
 
   private transform(
     msg: MsgBase,
     context: SecureChannelContext,
     controller: TransformStreamDefaultController<MsgBase>,
   ): void {
+    const requestId = msg.sequenceHeader.requestId
 
     switch (msg.header.msgType) {
-      
-      case MsgTypeChunk: {
+      case MsgTypeChunk:
+      case MsgTypeOpenChunk: {
         this.logger.debug("Received Chunk message");
-        context.chunkBuffers.push(msg.body as Uint8Array);
-        break;
+        // Buffer intermediate chunk bodies keyed by requestId.
+        const chunks = context.chunkBuffers.get(requestId) ?? []
+        chunks.push(msg.body as Uint8Array)
+        context.chunkBuffers.set(requestId, chunks)
+        break
       }
 
-      case MsgTypeFinal: {
-        this.logger.debug("Received Final message");;
-
-
-        while (context.chunkBuffers.length > 0) {
-          const chunk = context.chunkBuffers.pop()!;
-          msg.body = this.prependChunk(chunk, msg.body as Uint8Array);
+      case MsgTypeFinal:
+      case MsgTypeOpenFinal: {
+        this.logger.debug("Received Final message");
+        // Reassemble any buffered intermediate chunks in FIFO order.
+        const chunks = context.chunkBuffers.get(requestId)
+        if (chunks && chunks.length > 0) {
+          const finalBody = msg.body as Uint8Array
+          const totalLength = chunks.reduce((sum, c) => sum + c.byteLength, 0) + finalBody.byteLength
+          const assembled = new Uint8Array(totalLength)
+          let offset = 0
+          for (const chunk of chunks) {
+            assembled.set(chunk, offset)
+            offset += chunk.byteLength
+          }
+          assembled.set(finalBody, offset)
+          msg.body = assembled
+          context.chunkBuffers.delete(requestId)
         }
-        controller.enqueue(msg);
-        break;
+        controller.enqueue(msg)
+        break
       }
 
       default:
-        controller.enqueue(msg);
-        break;
+        controller.enqueue(msg)
+        break
     }
   }
 
   constructor(context: SecureChannelContext) {
     super({
-      transform: (data, controller)=> this.transform(data, context, controller),
-    });
+      transform: (data, controller) => this.transform(data, context, controller),
+    })
   }
 }

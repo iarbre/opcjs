@@ -8,6 +8,7 @@ import {
   OpenSecureChannelResponse,
   RequestHeader,
 } from "../schema/types";
+import { BinaryReader } from "../codecs/binary/binaryReader";
 import { ExtensionObject } from "../types/extensionObject";
 import { IOpcType } from "../types/iOpcType";
 import { NodeId } from "../types/nodeId";
@@ -17,7 +18,7 @@ import { MsgSecurityHeaderAsymmetric } from "./messages/msgSecurityHeaderAsymmet
 import { MsgSecurityHeaderSymmetric } from "./messages/msgSecurityHeaderSymmetric";
 import { MsgSequenceHeader } from "./messages/msgSequenceHeader";
 import { MsgSymmetric } from "./messages/msgSymmetric";
-import { MsgTypeFinal, MsgTypeOpenFinal } from "./messages/msgType";
+import { MsgTypeAbort, MsgTypeFinal, MsgTypeOpenFinal } from "./messages/msgType";
 import { PendingRequests } from "./pendingRequests";
 import { SecureChannelContext } from "./secureChannelContext";
 import { getLogger } from "../utils/logger/loggerProvider";
@@ -44,58 +45,116 @@ import { Certificate } from "../certificates/certificate";
  * facade.unsolicited.pipeTo(notificationHandler.writable);
  * ```
  */
+/** Fraction of the token lifetime at which a Renew request is proactively sent. */
+const TOKEN_RENEW_FRACTION = 0.75
+
 export class SecureChannelFacade implements ISecureChannel {
   private readonly pending = new PendingRequests();
   private readonly logger = getLogger("secureChannel.SecureChannelFacade");
   private readonly writer: WritableStreamDefaultWriter<MsgBase>;
   private readonly reader: ReadableStreamDefaultReader<MsgBase>;
+  /** Timer handle for the scheduled token renewal; undefined when no renewal is pending. */
+  private renewalTimer: ReturnType<typeof setTimeout> | undefined
 
   /**
-   * Sends the OpenSecureChannel request and resolves once the server replies.
-   * Updates `context.channelId` and `context.tokenId` on success.
+   * Builds and sends an OpenSecureChannel request.
+   * Called for both the initial Issue and subsequent Renew requests.
+   *
+   * On success the context `channelId` and `tokenId` are updated and a new
+   * renewal is scheduled at 75 % of the server-revised token lifetime, per
+   * OPC UA Part 4 Section 5.4.1 / Part 6 Section 6.7.3.
    */
-  public async openSecureChannel(): Promise<void> {
-    const requestHeader = new RequestHeader();
-    requestHeader.authenticationToken = NodeId.newTwoByte(0);
-    requestHeader.timestamp = new Date();
-    requestHeader.requestHandle = 0;
-    requestHeader.returnDiagnostics = 0;
-    requestHeader.auditEntryId = "";
-    requestHeader.timeoutHint = 0;
-    requestHeader.additionalHeader = ExtensionObject.newEmpty();
+  private async sendOpenSecureChannel(requestType: SecurityTokenRequestTypeEnum): Promise<void> {
+    const requestHeader = new RequestHeader()
+    requestHeader.authenticationToken = NodeId.newTwoByte(0)
+    requestHeader.timestamp = new Date()
+    requestHeader.requestHandle = 0
+    requestHeader.returnDiagnostics = 0
+    requestHeader.auditEntryId = ""
+    requestHeader.timeoutHint = 0
+    requestHeader.additionalHeader = ExtensionObject.newEmpty()
 
-    const request = new OpenSecureChannelRequest();
-    request.requestHeader = requestHeader;
-    request.clientProtocolVersion = 0;
-    request.requestType = SecurityTokenRequestTypeEnum.Issue;
-    request.securityMode = this.context.securityPolicy.getSecurityMode();
-    request.clientNonce = null;
-    request.requestedLifetime = 3600000;
+    const request = new OpenSecureChannelRequest()
+    request.requestHeader = requestHeader
+    request.clientProtocolVersion = 0
+    request.requestType = requestType
+    request.securityMode = this.context.securityPolicy.getSecurityMode()
+    request.clientNonce = null
+    request.requestedLifetime = 3600000
 
-    const { sequenceNumber, requestId } = this.context.nextIds();
+    const { sequenceNumber, requestId } = this.context.nextIds()
 
-    this.context.securityAlgorithm = this.context.securityPolicy.getAlgorithmAsymmetric(new Uint8Array(), new Uint8Array());
+    // The asymmetric security algorithm must be set before encoding the message.
+    this.context.securityAlgorithm = this.context.securityPolicy.getAlgorithmAsymmetric(
+      new Uint8Array(),
+      new Uint8Array(),
+    )
 
     const msg = new MsgAsymmetric(
-      new MsgHeader(MsgTypeOpenFinal, 0, 0),
+      new MsgHeader(MsgTypeOpenFinal, 0, this.context.channelId),
       new MsgSecurityHeaderAsymmetric(
         "http://opcfoundation.org/UA/SecurityPolicy#None",
       ),
       new MsgSequenceHeader(sequenceNumber, requestId),
       request,
-    );
+    )
 
-    this.logger.debug("Sending OpenSecureChannelRequest...");
-    return this.pushMessage(msg).then((response) => {
-      const openResponse = response as OpenSecureChannelResponse;
-      this.logger.debug("OpenSecureChannelResponse received");
-      this.context.channelId = openResponse.securityToken?.channelId as number;
-      this.context.tokenId = openResponse.securityToken?.tokenId as number;
-      this.context.securityAlgorithm=this.context.securityPolicy.getAlgorithmSymmetric(
-          new Certificate(),
-          new Certificate(),
-        );
-    });
+    const response = await this.pushMessage(msg) as OpenSecureChannelResponse
+
+    this.context.channelId = response.securityToken?.channelId as number
+    this.context.tokenId = response.securityToken?.tokenId as number
+    this.context.securityAlgorithm = this.context.securityPolicy.getAlgorithmSymmetric(
+      new Certificate(),
+      new Certificate(),
+    )
+
+    // Schedule the next renewal at 75 % of the server-revised lifetime so the
+    // client always holds a valid token.  Cancel any previous timer first.
+    const revisedLifetimeMs = response.securityToken?.revisedLifetime as number
+    this.scheduleRenewal(revisedLifetimeMs)
+  }
+
+  /**
+   * Schedules a proactive token renewal at {@link TOKEN_RENEW_FRACTION} of
+   * `lifetimeMs`.  Any previously scheduled renewal is cancelled first.
+   */
+  private scheduleRenewal(lifetimeMs: number): void {
+    if (this.renewalTimer !== undefined) {
+      clearTimeout(this.renewalTimer)
+    }
+    const delayMs = Math.floor(lifetimeMs * TOKEN_RENEW_FRACTION)
+    this.logger.debug(
+      `Scheduling SecurityToken renewal in ${delayMs} ms (75 % of ${lifetimeMs} ms lifetime).`,
+    )
+    this.renewalTimer = setTimeout(() => {
+      this.renewalTimer = undefined
+      this.logger.info("Renewing SecurityToken...")
+      this.sendOpenSecureChannel(SecurityTokenRequestTypeEnum.Renew).catch((err: unknown) => {
+        this.logger.error("SecurityToken renewal failed:", err)
+      })
+    }, delayMs)
+  }
+
+  /**
+   * Sends the initial OpenSecureChannel request and resolves once the server
+   * replies.  Updates `context.channelId` and `context.tokenId` on success
+   * and schedules automatic renewal at 75 % of the token lifetime.
+   */
+  public openSecureChannel(): Promise<void> {
+    this.logger.debug("Sending OpenSecureChannelRequest (Issue)...")
+    return this.sendOpenSecureChannel(SecurityTokenRequestTypeEnum.Issue)
+  }
+
+  /**
+   * Cancels any pending token renewal timer and releases the stream writer.
+   * Call this when the secure channel is no longer needed.
+   */
+  public close(): void {
+    if (this.renewalTimer !== undefined) {
+      clearTimeout(this.renewalTimer)
+      this.renewalTimer = undefined
+    }
+    this.writer.releaseLock()
   }
 
   // ─── ISecureChannel implementation ─────────────────────────────────────────────
@@ -142,15 +201,25 @@ export class SecureChannelFacade implements ISecureChannel {
           this.logger.error("Received empty frame");
         }
 
-        const response = value.body as IOpcType;
+        const requestId = value.sequenceHeader.requestId
 
-        if (response instanceof ServiceFault) {
-          this.pending.failAll(
-            // todo: create a human readable error message based on the ServiceFault content
-            new Error(`ServiceFault: ${JSON.stringify(response)}`),
-          );
+        if (value.header.msgType === MsgTypeAbort) {
+          // MSG+A: body is raw bytes containing StatusCode (UInt32) + Reason (String).
+          // Fail only the matching pending request and clear any buffered chunks.
+          const reader = new BinaryReader(value.body as Uint8Array)
+          const statusCode = reader.readUInt32()
+          const reason = reader.readString() as string
+          this.context.chunkBuffers.delete(requestId)
+          this.pending.fail(requestId, new Error(`Abort 0x${statusCode.toString(16).toUpperCase()}: ${reason}`))
         } else {
-          this.pending.settle(value.sequenceHeader.requestId, response);
+          const response = value.body as IOpcType
+          if (response instanceof ServiceFault) {
+            // A ServiceFault is the server’s error reply for one specific request.
+            // Only fail that request — do not tear down all pending requests.
+            this.pending.fail(requestId, new Error(`ServiceFault: ${JSON.stringify(response)}`))
+          } else {
+            this.pending.settle(requestId, response)
+          }
         }
       }
     } catch (e) {

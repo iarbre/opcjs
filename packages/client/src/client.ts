@@ -4,7 +4,7 @@ import {
   TcpConnectionHandler,
   SecureChannelFacade,
   SecureChannelContext,
-  SecureChannelMesssageEncoder,
+  SecureChannelMessageEncoder,
   SecureChannelTypeDecoder,
   SecureChannelMessageDecoder,
   SecureChannelTypeEncoder,
@@ -112,7 +112,7 @@ export class Client {
     const tcpMessageInjector = new TcpMessageInjector();
     const tcpConnectionHandler = new TcpConnectionHandler(tcpMessageInjector, scContext);
     const tcpMessageDecoupler = new TcpMessageDecoupler(tcpConnectionHandler.onTcpMessage.bind(tcpConnectionHandler));
-    const scMessageEncoder = new SecureChannelMesssageEncoder(scContext);
+    const scMessageEncoder = new SecureChannelMessageEncoder(scContext);
     const scTypeDecoder = new SecureChannelTypeDecoder(
       this.configuration.decoder,
     );
