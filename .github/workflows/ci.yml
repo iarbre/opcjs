@@ -74,15 +74,6 @@ jobs:
             npm run prepublish --prefix "packages/${pkg}"
           done
 
-      - name: Run unit tests
-        run: |
-          for pkg in ${{ steps.packages.outputs.list }}; do
-            echo "=== test: packages/${pkg} ==="
-            cd "packages/${pkg}"
-            OPCUA_EXTERNAL_SERVER=1 npx vitest run --reporter=verbose tests/unit
-            cd "$GITHUB_WORKSPACE"
-          done
-
       - name: Compute new versions
         id: version
         run: |

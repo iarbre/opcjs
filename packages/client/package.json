@@ -27,8 +27,9 @@
     "verify": "npx tsc --noEmit",
     "build": "tsup",
     "dev": "tsup --watch",
+    "unittest": "vitest --reporter=verbose tests/unit",
     "test": "vitest",
-    "prepublish": "npm run lint && npm run verify && npm run build"
+    "prepublish": "npm run lint && npm run verify && npm run build && npm run unittest"
   },
   "keywords": [
     "opcua",
