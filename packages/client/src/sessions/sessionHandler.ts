@@ -1,5 +1,5 @@
 import { ConfigurationClient } from "../configurationClient";
-import { EndpointDescription, ISecureChannel, NodeId, getLogger } from "opcjs-base";
+import { EndpointDescription, ISecureChannel, NodeId, UserTokenTypeEnum, getLogger } from "opcjs-base";
 import { SessionService } from "../services/sessionService";
 import { UserIdentity } from "../userIdentity";
 import { Session } from "./session";
@@ -13,6 +13,11 @@ export class SessionHandler {
         this.sessionServices = this.sessionServices.recreate(ret.authToken)
 
         const session = new Session(ret.sessionId, ret.authToken, ret.endpoint, this.sessionServices);
+
+        // Enforce user-token type restrictions from the client security configuration
+        // before activating; the endpoint is now known from CreateSession.
+        this.validateUserTokenPolicy(identity, ret.endpoint)
+
         await session.activateSession(identity);
         return session;
     }
@@ -54,7 +59,43 @@ export class SessionHandler {
         await this.sessionServices.closeSession(deleteSubscriptions)
     }
 
-    constructor(secureChannel:ISecureChannel, configuration: ConfigurationClient) {
+    /**
+     * Validates the requested user-identity token type against:
+     *   1. The `allowedUserTokenTypes` from the client security configuration — the
+     *      client has explicitly restricted which token types it will use.
+     *   2. The token policies advertised by the server endpoint — verifies that the
+     *      server actually supports at least one of the allowed types.
+     *
+     * Throws with a descriptive message if either check fails.
+     */
+    private validateUserTokenPolicy(identity: UserIdentity, endpoint: EndpointDescription): void {
+        const allowedTypes = this.configuration.securityConfiguration?.allowedUserTokenTypes
+        if (!allowedTypes) return   // no restriction configured
+
+        const requestedType = identity.getTokenType()
+
+        // 1. Client-side restriction: the chosen identity must be an allowed type.
+        if (!allowedTypes.includes(requestedType)) {
+            throw new Error(
+                `User token type '${UserTokenTypeEnum[requestedType]}' is not permitted by the ` +
+                `client security configuration. Allowed types: ` +
+                `${allowedTypes.map(t => UserTokenTypeEnum[t]).join(', ')}.`,
+            )
+        }
+
+        // 2. Server-side availability: at least one allowed type must be offered.
+        const serverTypes = endpoint.userIdentityTokens?.map(p => p.tokenType) ?? []
+        const intersection = allowedTypes.filter(t => serverTypes.includes(t))
+        if (intersection.length === 0) {
+            throw new Error(
+                `Server endpoint does not offer any user token type from the allowed list: ` +
+                `${allowedTypes.map(t => UserTokenTypeEnum[t]).join(', ')}. ` +
+                `Server offers: ${serverTypes.map(t => UserTokenTypeEnum[t]).join(', ')}.`,
+            )
+        }
+    }
+
+    constructor(secureChannel:ISecureChannel, private configuration: ConfigurationClient) {
         this.sessionServices = new SessionService(NodeId.newTwoByte(0), secureChannel, configuration);
     }
 }

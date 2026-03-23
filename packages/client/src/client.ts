@@ -30,6 +30,7 @@ import {
 import { SessionHandler } from './sessions/sessionHandler.js'
 import { Session } from './sessions/session.js'
 import { SessionInvalidError } from './sessions/sessionInvalidError.js'
+import { SECURITY_POLICY_NONE_URI } from './securityConfiguration.js'
 import { AttributeService } from './services/attributeService.js'
 import { ReadValueResult } from './readValueResult.js'
 import { SubscriptionHandler } from './subscriptionHandler.js'
@@ -233,7 +234,40 @@ export class Client {
     await sc.openSecureChannel();
     this.logger.debug("Secure channel established.");
 
+    // Enforce any channel-level security requirements before proceeding.
+    this.enforceChannelSecurityConfig(sc);
+
     return { ws, sc };
+  }
+
+  /**
+   * Validates the negotiated channel's security policy and mode against the
+   * client's `SecurityConfiguration` (OPC UA Part 2, Security Administration).
+   *
+   * Throws if:
+   * - `allowSecurityPolicyNone` is `false` and the channel uses SecurityPolicy None.
+   * - `messageSecurityMode` is set and does not match the channel's actual mode.
+   */
+  private enforceChannelSecurityConfig(sc: SecureChannelFacade): void {
+    const config = this.configuration.securityConfiguration
+    if (!config) return
+
+    const negotiatedPolicy = sc.getSecurityPolicy()
+    const negotiatedMode = sc.getSecurityMode()
+
+    if (config.allowSecurityPolicyNone === false && negotiatedPolicy === SECURITY_POLICY_NONE_URI) {
+      throw new Error(
+        'Connection refused: SecurityPolicy None is disabled by the client security configuration. ' +
+        'Only SecurityPolicy None is currently supported by this client implementation.',
+      )
+    }
+
+    if (config.messageSecurityMode !== undefined && config.messageSecurityMode !== negotiatedMode) {
+      throw new Error(
+        `Connection refused: negotiated MessageSecurityMode ${negotiatedMode} does not match ` +
+        `the required mode ${config.messageSecurityMode} from the security configuration.`,
+      )
+    }
   }
 
   /**

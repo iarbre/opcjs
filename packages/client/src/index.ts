@@ -4,6 +4,7 @@
 
 export * from './client.js'
 export * from './configurationClient.js'
+export * from './securityConfiguration.js'
 export * from './userIdentity.js'
 export * from './browseNodeResult.js'
 export * from './sessions/sessionInvalidError.js'

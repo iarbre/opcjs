@@ -7,7 +7,7 @@
 |------|-----------------|--------|-------|
 | ✅ | Address Space Client NodeId IdTypes | Done | All 4 types (Numeric, String, Guid, Opaque) in `nodeId.ts` |
 | ❌ | Documentation – Core Capacities | Missing | Document number of supported SecureChannels, Sessions, ContinuationPoints, Subscriptions, etc. |
-| ❌ | Security Administration | Missing | No configuration API for user-token policies, security policies, MessageSecurityMode, trusted CAs, or cert rejection behaviour. All hardcoded. |
+| ✅ | Security Administration | Done | `SecurityConfiguration` type in `securityConfiguration.ts`. Enforced in `client.ts` (`allowSecurityPolicyNone`, `messageSecurityMode`) and `sessionHandler.ts` (`allowedUserTokenTypes`). `trustedCAs` / `unknownCertificatePolicy` stored for future cert-based security. |
 | ✅ | Session Client Auto Reconnect | Done | `withSessionRefresh()` in `client.ts` catches `SessionInvalidError` AND transport-level errors. On transport error it calls `reconnectAndReactivate()`: reopens the channel, tries `ActivateSession` on the existing session, and only creates a brand-new session if that fails. |
 | ⚠️ | Session Client Base | Partial | `CreateSession` ✅, `ActivateSession` ✅, **`CloseSession` ❌ not implemented** — `disconnect()` in `client.ts` is a stub. |
 | ✅ | Session Client General Service Behaviour | Done | Auth token, requestHandle, and serviceResult evaluation all handled in `serviceBase.ts`. |
@@ -88,7 +88,7 @@
 
 ### P1 — Required conformance units (substantial gaps)
 
-- [ ] **Security Administration** — introduce a `SecurityConfiguration` type to configure: user-token policies, enable/disable SecurityPolicy None, MessageSecurityMode selection, trusted CAs, and unknown-certificate policy.
+- [x] **Security Administration** — introduce a `SecurityConfiguration` type to configure: user-token policies, enable/disable SecurityPolicy None, MessageSecurityMode selection, trusted CAs, and unknown-certificate policy.
 
 ### P2 — Optional conformance units (nice to have)
 

@@ -11,7 +11,17 @@ import {
   registerTypeDecoders
 } from "opcjs-base";
 
+import type { SecurityConfiguration } from './securityConfiguration.js'
+
 export class ConfigurationClient extends Configuration {
+  /**
+   * Optional security restrictions applied during `Client.connect()`.
+   * When not set, permissive defaults are used (SecurityPolicy None allowed,
+   * all user-token types accepted).
+   *
+   * @see SecurityConfiguration
+   */
+  public securityConfiguration?: SecurityConfiguration
   public static getSimple(
     name: string,
     company: string,
