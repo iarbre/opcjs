@@ -34,6 +34,14 @@ export class Session {
         return this.authToken;
     }
 
+    getSessionId(): number {
+        return this.sessionId;
+    }
+
+    getEndpoint(): EndpointDescription {
+        return this.endpoint;
+    }
+
     /**
      * Closes the session on the server (OPC UA Part 4, Section 5.7.4).
      * @param deleteSubscriptions - When true the server deletes all Subscriptions

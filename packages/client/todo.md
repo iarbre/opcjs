@@ -8,7 +8,7 @@
 | ✅ | Address Space Client NodeId IdTypes | Done | All 4 types (Numeric, String, Guid, Opaque) in `nodeId.ts` |
 | ❌ | Documentation – Core Capacities | Missing | Document number of supported SecureChannels, Sessions, ContinuationPoints, Subscriptions, etc. |
 | ❌ | Security Administration | Missing | No configuration API for user-token policies, security policies, MessageSecurityMode, trusted CAs, or cert rejection behaviour. All hardcoded. |
-| ⚠️ | Session Client Auto Reconnect | Partial | `withSessionRefresh()` in `client.ts` creates a new session on `BadSessionIdInvalid`/`BadSessionClosed` but does **not** first try `ActivateSession` on a new SecureChannel when the channel drops but the session is still valid. |
+| ✅ | Session Client Auto Reconnect | Done | `withSessionRefresh()` in `client.ts` catches `SessionInvalidError` AND transport-level errors. On transport error it calls `reconnectAndReactivate()`: reopens the channel, tries `ActivateSession` on the existing session, and only creates a brand-new session if that fails. |
 | ⚠️ | Session Client Base | Partial | `CreateSession` ✅, `ActivateSession` ✅, **`CloseSession` ❌ not implemented** — `disconnect()` in `client.ts` is a stub. |
 | ✅ | Session Client General Service Behaviour | Done | Auth token, requestHandle, and serviceResult evaluation all handled in `serviceBase.ts`. |
 | ⚠️ | Session Client KeepAlive | Partial | Keep-alive only happens through the Publish loop. If no subscription is active, **nothing keeps the session alive**. A dedicated periodic keep-alive is required. |
@@ -82,7 +82,7 @@
 
 - [x] **CloseSession** — implement `CloseSessionRequest` in `sessionService.ts` and wire into `client.disconnect()`.
 - [x] **Session KeepAlive without subscriptions** — add a dedicated keep-alive timer that reads `Server_ServerStatus` (or a similar cheap node) at regular intervals when no subscription is active.
-- [ ] **Auto Reconnect – ActivateSession on existing session** — when the SecureChannel drops but the session timeout has not expired, attempt `ActivateSession` on a new channel before creating a brand-new session.
+- [x] **Auto Reconnect – ActivateSession on existing session** — when the SecureChannel drops but the session timeout has not expired, attempt `ActivateSession` on a new channel before creating a brand-new session.
 - [ ] **Documentation – Core Capacities** — add a section to the README stating the supported number of SecureChannels, Sessions, ContinuationPoints, etc.
 - [ ] **Time Sync – OS based support (claim)** — document that the client relies on the OS system clock (NTP / systemd-timesyncd) so the "Time Sync – Support" required CU is satisfied.
 

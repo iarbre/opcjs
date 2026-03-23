@@ -95,19 +95,41 @@ export class Client {
    * This covers the reactive case: a service call reveals that the server has
    * already dropped the session (e.g. due to timeout). The new session is
    * established transparently before re-running the original operation.
+   *
+   * For any other error (e.g. transport-level failures when the SecureChannel
+   * drops), this method attempts to reconnect the channel and reactivate the
+   * existing session first — falling back to a brand-new session only when
+   * reactivation fails — before retrying the operation once.
    */
   private async withSessionRefresh<T>(fn: () => Promise<T>): Promise<T> {
     try {
       return await fn()
     } catch (err) {
-      if (!(err instanceof SessionInvalidError)) throw err
+      if (err instanceof SessionInvalidError) {
+        this.logger.info(`Session invalid (${err.statusCode.toString(16)}), refreshing session...`)
+        this.session = await this.sessionHandler!.createNewSession(this.identity)
+        this.initServices()
+        this.logger.info('Session refreshed, retrying operation.')
 
-      this.logger.info(`Session invalid (${err.statusCode.toString(16)}), refreshing session...`)
-      this.session = await this.sessionHandler!.createNewSession(this.identity)
-      this.initServices()
-      this.logger.info('Session refreshed, retrying operation.')
+        // Retry once with the new session.  If it fails again the error propagates.
+        return await fn()
+      }
 
-      // Retry once with the new session.  If it fails again the error propagates.
+      // Possibly a channel drop: attempt reconnect + ActivateSession on existing session
+      // before giving up and creating a brand-new session (OPC UA Part 4 Session Auto Reconnect).
+      this.logger.info('Service call failed, attempting channel reconnect and session reactivation...')
+      try {
+        await this.reconnectAndReactivate()
+        this.initServices()
+        this.logger.info('Reconnected successfully, retrying operation.')
+      } catch (reconnectErr) {
+        // Reconnect itself failed; surface the original error so the caller
+        // gets a meaningful diagnostic (the reconnect error is logged separately).
+        this.logger.warn('Channel reconnect failed:', reconnectErr)
+        throw err
+      }
+
+      // Retry once after a successful reconnect.  If it fails again the error propagates.
       return await fn()
     }
   }
@@ -137,7 +159,30 @@ export class Client {
   }
 
   async connect(): Promise<void> {
+    const { ws, sc } = await this.openTransportAndChannel()
 
+    this.secureChannel = sc
+    this.secureChannelFacade = sc
+    this.ws = ws
+
+    this.logger.debug('Creating session...')
+    this.sessionHandler = new SessionHandler(sc, this.configuration)
+    this.session = await this.sessionHandler.createNewSession(this.identity)
+    this.logger.debug('Session created.')
+
+    this.logger.debug('Initializing services...')
+    this.initServices()
+    this.startKeepAlive()
+  }
+
+  /**
+   * Builds the full WebSocket → TCP → SecureChannel pipeline and returns the
+   * two objects needed to drive it: the raw WebSocket facade (for teardown)
+   * and the SecureChannelFacade (for service requests/session management).
+   *
+   * Extracted from `connect()` so it can be reused by `reconnectAndReactivate()`.
+   */
+  private async openTransportAndChannel(): Promise<{ ws: WebSocketFascade; sc: SecureChannelFacade }> {
     const wsOptions = { endpoint: this.endpointUrl }
     const ws = new WebSocketFascade(wsOptions);
     const webSocketReadableStream = new WebSocketReadableStream(ws, 1000);
@@ -170,9 +215,6 @@ export class Client {
 
     const sc = new SecureChannelFacade(scContext, scTypeDecoder, scTypeEncoder);
 
-    // const response = await sc.send(request, wsWritable);
-
-    //const channel = ChannelFactory.createChannel(this.endpointUrl);
     let connected = false;
     while (!connected) {
       this.logger.debug(`Connecting to OPC UA server at ${this.endpointUrl}...`);
@@ -187,22 +229,58 @@ export class Client {
     }
     this.logger.info("Connected to OPC UA server.");
 
-    //this.channel = new SecureChannel(channel, this.configuration);
     this.logger.debug("Opening secure channel...");
     await sc.openSecureChannel();
     this.logger.debug("Secure channel established.");
 
-    this.logger.debug('Creating session...')
-    this.sessionHandler = new SessionHandler(sc, this.configuration)
+    return { ws, sc };
+  }
+
+  /**
+   * Tears down the current (dead) channel and establishes a fresh one, then
+   * attempts to recover the existing OPC UA session via ActivateSession before
+   * falling back to a full CreateSession + ActivateSession.
+   *
+   * OPC UA Part 4, Section 5.7.1 / Session Client Auto Reconnect conformance unit:
+   * When the SecureChannel drops but the server-side session has not yet timed
+   * out, the client SHOULD reuse the existing session by calling ActivateSession
+   * on the new channel.  Only if that fails should the client create a new session.
+   */
+  private async reconnectAndReactivate(): Promise<void> {
+    this.logger.info('Tearing down dead channel before reconnect...')
+
+    // Close the old channel and WebSocket (best effort — they may already be dead).
+    try { this.secureChannelFacade?.close() } catch { /* already dead */ }
+    try { this.ws?.close() } catch { /* already dead */ }
+    this.secureChannelFacade = undefined
+    this.secureChannel = undefined
+    this.ws = undefined
+
+    const { ws, sc } = await this.openTransportAndChannel()
     this.secureChannel = sc
     this.secureChannelFacade = sc
     this.ws = ws
-    this.session = await this.sessionHandler.createNewSession(this.identity)
-    this.logger.debug('Session created.')
+    this.sessionHandler = new SessionHandler(sc, this.configuration)
 
-    this.logger.debug('Initializing services...')
-    this.initServices()
-    this.startKeepAlive()
+    // Attempt to reactivate the existing session on the new channel.
+    if (this.session) {
+      const reactivated = await this.sessionHandler.tryActivateExistingSession(
+        this.session.getAuthToken(),
+        this.session.getSessionId(),
+        this.session.getEndpoint(),
+        this.identity,
+      )
+      if (reactivated !== null) {
+        this.session = reactivated
+        this.logger.info('Existing session successfully reactivated on new channel.')
+        return
+      }
+      this.logger.info('ActivateSession for existing session failed; creating a fresh session...')
+    }
+
+    // Fall back: full CreateSession + ActivateSession.
+    this.session = await this.sessionHandler.createNewSession(this.identity)
+    this.logger.info('Fresh session established on new channel.')
   }
 
   /**
