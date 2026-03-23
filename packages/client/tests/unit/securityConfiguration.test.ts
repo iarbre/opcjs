@@ -56,8 +56,7 @@ function makeClient(cfg: Partial<ConfigurationClient> = {}): Client {
 
 function callEnforceChannelSecurityConfig(client: Client, channel: ReturnType<typeof makeChannel>): void {
   // Access private method through type erasure for unit-testing purposes.
-  ;(client as unknown as Record<string, (c: unknown) => void>)
-    ['enforceChannelSecurityConfig'](channel)
+  ;(client as unknown as Record<string, (c: unknown) => void>)['enforceChannelSecurityConfig'](channel)
 }
 
 // ---------------------------------------------------------------------------
@@ -89,8 +88,7 @@ function callValidateUserTokenPolicy(
   identity: UserIdentity,
   endpoint: EndpointDescription,
 ): void {
-  ;(handler as unknown as Record<string, (i: UserIdentity, e: EndpointDescription) => void>)
-    ['validateUserTokenPolicy'](identity, endpoint)
+  ;(handler as unknown as Record<string, (i: UserIdentity, e: EndpointDescription) => void>)['validateUserTokenPolicy'](identity, endpoint)
 }
 
 // ---------------------------------------------------------------------------
