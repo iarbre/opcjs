@@ -23,7 +23,6 @@ import {
   BrowseDirectionEnum,
   BrowseResultMaskEnum,
   ReferenceDescription,
-  UaPrimitive,
   ILogger,
 } from 'opcjs-base'
 
@@ -42,6 +41,7 @@ import { MethodService } from './services/methodService.js'
 import { CallMethodResult } from './callMethodResult.js'
 import { BrowseService } from './services/browseService.js'
 import { BrowseNodeResult } from './browseNodeResult.js'
+import { MethodArgument } from './methodArgument.js'
 
 /** NodeId of Server_ServerStatus (ns=0, i=2256) — a cheap server-side read used for session keep-alive. */
 const SERVER_STATUS_NODE_ID = NodeId.newNumeric(0, 2256)
@@ -369,7 +369,7 @@ export class Client {
   async callMethod(
     objectId: NodeId,
     methodId: NodeId,
-    inputArguments: UaPrimitive[] = []
+    inputArguments: MethodArgument[] = []
   ): Promise<CallMethodResult> {
     return this.withSessionRefresh(async () => {
       const request = new CallMethodRequest()

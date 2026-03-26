@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { Client } from '../../src/client.js';
 import { ConfigurationClient } from '../../src/configurationClient.js';
 import { UserIdentity } from '../../src/userIdentity.js';
-import { NodeId, StatusCode, uaFloat, uaUint32 } from 'opcjs-base';
+import { LocalizedText, NodeId, StatusCode, uaFloat, uaUint32 } from 'opcjs-base';
 
 const endpointUrl = 'wss://add8470387ec:62542/Test/ReferenceServer/';
 const methodsObject = NodeId.newString(2, "Methods");
@@ -138,5 +138,24 @@ describe('callMethod', () => {
         expect(result.values[0]).toBeInstanceOf(Uint8Array)
         expect((result.values[0] as Uint8Array).byteLength).toBe(SIZE)
         expect(result.values[0]).toEqual(payload)
+    })
+
+    it('EchoLocalizedText round-trips a LocalizedText with locale and text', async () => {
+        const client = makeClient();
+        await client.connect();
+
+        const input = new LocalizedText('en-US', 'Hello World');
+
+        const result = await client.callMethod(
+            methodsObject,
+            NodeId.newString(2, 'Methods_EchoLocalizedText'),
+            [input]);
+
+        expect(result.statusCode).toBe(StatusCode.Good);
+        expect(result.values.length).toBe(1);
+        expect(result.values[0]).toBeInstanceOf(LocalizedText);
+        const output = result.values[0] as LocalizedText;
+        expect(output.locale).toBe('en-US');
+        expect(output.text).toBe('Hello World');
     })
 })
