@@ -39,9 +39,13 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
   private logger = getLogger("secureChannel.SecureChannelMessageDecoder");
 
   /**
-   * Validates that `sequenceNumber` is strictly increasing from the last
+   * Validates that `sequenceNumber` is monotonically increasing from the last
    * seen remote sequence.  Allows exactly one UInt32 wrap-around per token.
-   * Returns false and logs an error if the number is a duplicate or out of order.
+   *
+   * Forward gaps are tolerated with a warning because some server implementations
+   * may consume sequence numbers internally (e.g. cancelled responses) without
+   * sending them on the wire.  Backward jumps and duplicates are rejected as
+   * errors since they indicate replay or reordering.
    */
   private validateSequenceNumber(sequenceNumber: number, msgType: string, controller: TransformStreamDefaultController<MsgBase>): boolean {
     const last = this.context.lastRemoteSequenceNumber
@@ -53,16 +57,23 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
       return true
     }
 
-    const isIncrement = sequenceNumber === last + 1
     const isWrap = last >= SEQ_WRAP_THRESHOLD && sequenceNumber < SEQ_WRAP_MAX
+    const isForward = sequenceNumber > last
 
-    if (!isIncrement && !isWrap) {
-      this.logger.error(`[${msgType}] Invalid remote sequence number: expected ${last + 1}, got ${sequenceNumber}`)
-      controller.error(new Error(`Invalid remote sequence number: expected ${last + 1}, got ${sequenceNumber}`))
+    if (!isForward && !isWrap) {
+      // Backward jump or duplicate — possible replay or reordering.
+      this.logger.error(`[${msgType}] Invalid remote sequence number: expected > ${last}, got ${sequenceNumber}`)
+      controller.error(new Error(`Invalid remote sequence number: expected > ${last}, got ${sequenceNumber}`))
       return false
     }
 
-    this.logger.debug(`[${msgType}] Sequence number advanced: ${last} → ${sequenceNumber}`)
+    if (sequenceNumber !== last + 1 && !isWrap) {
+      // Forward gap — the server skipped one or more numbers.  Accept but warn.
+      this.logger.warn(`[${msgType}] Remote sequence number gap: expected ${last + 1}, got ${sequenceNumber} (skipped ${sequenceNumber - last - 1})`)
+    } else {
+      this.logger.debug(`[${msgType}] Sequence number advanced: ${last} → ${sequenceNumber}`)
+    }
+
     this.context.lastRemoteSequenceNumber = sequenceNumber
     return true
   }
