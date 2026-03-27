@@ -43,12 +43,13 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
    * seen remote sequence.  Allows exactly one UInt32 wrap-around per token.
    * Returns false and logs an error if the number is a duplicate or out of order.
    */
-  private validateSequenceNumber(sequenceNumber: number, controller: TransformStreamDefaultController<MsgBase>): boolean {
+  private validateSequenceNumber(sequenceNumber: number, msgType: string, controller: TransformStreamDefaultController<MsgBase>): boolean {
     const last = this.context.lastRemoteSequenceNumber
 
     if (last === undefined) {
       // First received message — accept any starting value (non-ECC profiles).
       this.context.lastRemoteSequenceNumber = sequenceNumber
+      this.logger.debug(`[${msgType}] Sequence number initialized to ${sequenceNumber}`)
       return true
     }
 
@@ -56,11 +57,12 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
     const isWrap = last >= SEQ_WRAP_THRESHOLD && sequenceNumber < SEQ_WRAP_MAX
 
     if (!isIncrement && !isWrap) {
-      this.logger.error(`Invalid remote sequence number: expected ${last + 1}, got ${sequenceNumber}`)
+      this.logger.error(`[${msgType}] Invalid remote sequence number: expected ${last + 1}, got ${sequenceNumber}`)
       controller.error(new Error(`Invalid remote sequence number: expected ${last + 1}, got ${sequenceNumber}`))
       return false
     }
 
+    this.logger.debug(`[${msgType}] Sequence number advanced: ${last} → ${sequenceNumber}`)
     this.context.lastRemoteSequenceNumber = sequenceNumber
     return true
   }
@@ -83,12 +85,11 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
           secHeader,
           this.context.securityAlgorithm!,
         );
-        // Per OPC UA Part 6 §6.7.2.4, each new SecurityToken resets the sender's
-        // sequence counter to a random value in [1, 4095].  Treat the OPN message
-        // (both Issue and Renew) as the start of a fresh counter by clearing the
-        // last-seen value, so validateSequenceNumber accepts any starting value.
-        this.context.lastRemoteSequenceNumber = undefined
-        if (!this.validateSequenceNumber(msgAsym.sequenceHeader.sequenceNumber, controller)) return
+        // Per OPC UA Part 6 §6.7.2.4, a Renew continues the existing sequence
+        // counter — only the initial Issue starts a fresh one.  The very first
+        // OPN (Issue) is already handled because lastRemoteSequenceNumber starts
+        // as undefined, so validateSequenceNumber accepts any starting value.
+        if (!this.validateSequenceNumber(msgAsym.sequenceHeader.sequenceNumber, 'OPN', controller)) return
         controller.enqueue(msgAsym);
         break;
       }
@@ -101,7 +102,7 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
         this.logger.warn("SecureChannel received Abort message");
         const secHeader = MsgSecurityHeaderSymmetric.decode(buffer);
         const msgSym = MsgSymmetric.decode(buffer, header, secHeader, this.context.securityAlgorithm!);
-        if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, controller)) return
+          if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'MSG-A', controller)) return
         controller.enqueue(msgSym);
         break;
       }
@@ -110,7 +111,7 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
         this.logger.debug("SecureChannel received Chunk message.");
         const secHeader = MsgSecurityHeaderSymmetric.decode(buffer);
         const msgSym = MsgSymmetric.decode(buffer, header, secHeader, this.context.securityAlgorithm!);
-        if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, controller)) return
+          if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'MSG-C', controller)) return
         controller.enqueue(msgSym);
         break;
       }
@@ -119,7 +120,7 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
         this.logger.debug("SecureChannel received Final message");
         const secHeader = MsgSecurityHeaderSymmetric.decode(buffer);
         const msgSym = MsgSymmetric.decode(buffer, header, secHeader, this.context.securityAlgorithm!);
-        if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, controller)) return
+          if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'MSG-F', controller)) return
         controller.enqueue(msgSym);
         break;
       }
@@ -130,7 +131,7 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
         const msgSym = MsgSymmetric.decode(buffer, header, secHeader, this.context.securityAlgorithm!);
         // Keep the sequence counter in sync even though CLO handling is not fully
         // implemented; without this, the next MSG would fail validation.
-        this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, controller);
+          this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'CLO-F', controller);
         break;
       }
 
