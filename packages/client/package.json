@@ -1,6 +1,6 @@
 {
   "name": "opcjs-client",
-  "version": "0.1.39-alpha",
+  "version": "0.1.40-alpha",
   "description": "A client for OPC UA communication.",
   "repository": {
     "type": "git",
