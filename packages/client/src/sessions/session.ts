@@ -1,5 +1,5 @@
 import { EndpointDescription, IssuedIdentityToken, NodeId, UserTokenTypeEnum } from "opcjs-base";
-import { IssuerConfiguration } from "../issuerConfiguration";
+import { IssuerConfiguration } from "../configuration/issuerConfiguration";
 import { SessionService } from "../services/sessionService";
 import { UserIdentity } from "../userIdentity";
 

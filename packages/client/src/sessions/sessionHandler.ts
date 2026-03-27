@@ -1,4 +1,4 @@
-import { ConfigurationClient } from "../configurationClient";
+import { ConfigurationClient } from "../configuration/configurationClient";
 import { EndpointDescription, ISecureChannel, NodeId, UserTokenTypeEnum, getLogger } from "opcjs-base";
 import { SessionService } from "../services/sessionService";
 import { UserIdentity } from "../userIdentity";

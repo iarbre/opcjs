@@ -23,7 +23,7 @@ import {
 } from 'opcjs-base'
 
 import { Client } from '../../src/client.js'
-import { ConfigurationClient } from '../../src/configurationClient.js'
+import { ConfigurationClient } from '../../src/configuration/configurationClient.js'
 import { SECURITY_POLICY_NONE_URI } from '../../src/securityConfiguration.js'
 import { SessionHandler } from '../../src/sessions/sessionHandler.js'
 import { UserIdentity } from '../../src/userIdentity.js'

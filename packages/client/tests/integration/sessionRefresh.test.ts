@@ -17,7 +17,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { NodeId, StatusCode } from 'opcjs-base'
 
 import { Client } from '../../src/client.js'
-import { ConfigurationClient } from '../../src/configurationClient.js'
+import { ConfigurationClient } from '../../src/configuration/configurationClient.js'
 import { SessionInvalidError } from '../../src/sessions/sessionInvalidError.js'
 import { UserIdentity } from '../../src/userIdentity.js'
 

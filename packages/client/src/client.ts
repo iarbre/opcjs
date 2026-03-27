@@ -32,16 +32,16 @@ import { SessionInvalidError } from './sessions/sessionInvalidError.js'
 import { SECURITY_POLICY_NONE_URI } from './securityConfiguration.js'
 import { AttributeService } from './services/attributeService.js'
 import { ReadValueResult } from './readValueResult.js'
-import { SubscriptionHandler } from './subscriptionHandler.js'
-import { SubscriptionService } from './services/subscriptionService.js'
+import { SubscriptionHandler } from './subscription/subscriptionHandler.js'
+import { CreateSubscriptionOptions, SubscriptionService } from './services/subscriptionService.js'
 import { MonitoredItemService } from './services/monitoredItemService.js'
 import { UserIdentity } from './userIdentity.js'
-import { ConfigurationClient } from './configurationClient.js'
+import { ConfigurationClient } from './configuration/configurationClient.js'
 import { MethodService } from './services/methodService.js'
-import { CallMethodResult } from './callMethodResult.js'
+import { CallMethodResult } from './method/callMethodResult.js'
 import { BrowseService } from './services/browseService.js'
 import { BrowseNodeResult } from './browseNodeResult.js'
-import { CallMethodArgument } from './callMethodArgument.js'
+import { CallMethodArgument } from './method/callMethodArgument.js'
 
 /** NodeId of Server_ServerStatus (ns=0, i=2256) — a cheap server-side read used for session keep-alive. */
 const SERVER_STATUS_NODE_ID = NodeId.newNumeric(0, 2256)
@@ -456,8 +456,9 @@ export class Client {
   async subscribe(
     ids: NodeId[],
     callback: (data: { id: NodeId; value: unknown }[]) => void,
+    options?: CreateSubscriptionOptions
   ) {
-    this.subscriptionHandler?.subscribe(ids, callback);
+    this.subscriptionHandler?.subscribe(ids, callback, options);
   }
 
   constructor(

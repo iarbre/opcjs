@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { Client } from '../../src/client.js';
-import { ConfigurationClient } from '../../src/configurationClient.js';
+import { ConfigurationClient } from '../../src/configuration/configurationClient.js';
 import { UserIdentity } from '../../src/userIdentity.js';
 import { NodeId, StatusCode } from 'opcjs-base';
 
