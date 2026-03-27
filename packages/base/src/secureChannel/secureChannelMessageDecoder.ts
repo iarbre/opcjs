@@ -83,6 +83,11 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
           secHeader,
           this.context.securityAlgorithm!,
         );
+        // Per OPC UA Part 6 §6.7.2.4, each new SecurityToken resets the sender's
+        // sequence counter to a random value in [1, 4095].  Treat the OPN message
+        // (both Issue and Renew) as the start of a fresh counter by clearing the
+        // last-seen value, so validateSequenceNumber accepts any starting value.
+        this.context.lastRemoteSequenceNumber = undefined
         if (!this.validateSequenceNumber(msgAsym.sequenceHeader.sequenceNumber, controller)) return
         controller.enqueue(msgAsym);
         break;
@@ -119,9 +124,15 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
         break;
       }
 
-      case MsgTypeCloseFinal:
-        this.logger.warn("Unimplemented CloseFinal message.");
+      case MsgTypeCloseFinal: {
+        this.logger.warn("SecureChannel received CloseFinal message.");
+        const secHeader = MsgSecurityHeaderSymmetric.decode(buffer);
+        const msgSym = MsgSymmetric.decode(buffer, header, secHeader, this.context.securityAlgorithm!);
+        // Keep the sequence counter in sync even though CLO handling is not fully
+        // implemented; without this, the next MSG would fail validation.
+        this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, controller);
         break;
+      }
 
       default:
         this.logger.warn("SecureChannel received unknown message type:", header.msgType);
