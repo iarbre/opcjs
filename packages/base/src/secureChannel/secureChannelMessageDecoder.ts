@@ -91,9 +91,12 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
       case MsgTypeAbort: {
         // MSG+A: decrypt the body so the facade can read StatusCode + Reason.
         // The decoded body is passed through as raw bytes (not decoded as IOpcType).
+        // Sequence number must still be validated and the counter updated so that
+        // subsequent messages on the same channel are not incorrectly rejected.
         this.logger.warn("SecureChannel received Abort message");
         const secHeader = MsgSecurityHeaderSymmetric.decode(buffer);
         const msgSym = MsgSymmetric.decode(buffer, header, secHeader, this.context.securityAlgorithm!);
+        if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, controller)) return
         controller.enqueue(msgSym);
         break;
       }
