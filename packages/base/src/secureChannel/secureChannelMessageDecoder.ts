@@ -48,7 +48,7 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
    * channel.  Only truly anomalous conditions (e.g. a very large backward
    * jump that could indicate corruption) are treated as errors.
    */
-  private validateSequenceNumber(sequenceNumber: number, msgType: string, controller: TransformStreamDefaultController<MsgBase>): boolean {
+  private validateSequenceNumber(sequenceNumber: number, msgType: string): boolean {
     const last = this.context.lastRemoteSequenceNumber
 
     if (last === undefined) {
@@ -111,7 +111,7 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
         // counter — only the initial Issue starts a fresh one.  The very first
         // OPN (Issue) is already handled because lastRemoteSequenceNumber starts
         // as undefined, so validateSequenceNumber accepts any starting value.
-        if (!this.validateSequenceNumber(msgAsym.sequenceHeader.sequenceNumber, 'OPN', controller)) return
+        if (!this.validateSequenceNumber(msgAsym.sequenceHeader.sequenceNumber, 'OPN')) return
         controller.enqueue(msgAsym);
         break;
       }
@@ -124,7 +124,7 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
         this.logger.warn("SecureChannel received Abort message");
         const secHeader = MsgSecurityHeaderSymmetric.decode(buffer);
         const msgSym = MsgSymmetric.decode(buffer, header, secHeader, this.context.securityAlgorithm!);
-          if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'MSG-A', controller)) return
+          if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'MSG-A')) return
         controller.enqueue(msgSym);
         break;
       }
@@ -133,7 +133,7 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
         this.logger.debug("SecureChannel received Chunk message.");
         const secHeader = MsgSecurityHeaderSymmetric.decode(buffer);
         const msgSym = MsgSymmetric.decode(buffer, header, secHeader, this.context.securityAlgorithm!);
-          if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'MSG-C', controller)) return
+          if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'MSG-C')) return
         controller.enqueue(msgSym);
         break;
       }
@@ -142,7 +142,7 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
         this.logger.debug("SecureChannel received Final message");
         const secHeader = MsgSecurityHeaderSymmetric.decode(buffer);
         const msgSym = MsgSymmetric.decode(buffer, header, secHeader, this.context.securityAlgorithm!);
-          if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'MSG-F', controller)) return
+          if (!this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'MSG-F')) return
         controller.enqueue(msgSym);
         break;
       }
@@ -153,7 +153,7 @@ export class SecureChannelMessageDecoder extends TransformStream<Uint8Array, Msg
         const msgSym = MsgSymmetric.decode(buffer, header, secHeader, this.context.securityAlgorithm!);
         // Keep the sequence counter in sync even though CLO handling is not fully
         // implemented; without this, the next MSG would fail validation.
-          this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'CLO-F', controller);
+          this.validateSequenceNumber(msgSym.sequenceHeader.sequenceNumber, 'CLO-F');
         break;
       }
 
