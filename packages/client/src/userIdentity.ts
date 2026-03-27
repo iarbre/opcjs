@@ -1,5 +1,5 @@
 import { IssuedIdentityToken, UserIdentityToken, UserNameIdentityToken, UserTokenTypeEnum } from "opcjs-base";
-import { IssuerConfiguration } from "./issuerConfiguration";
+import { IssuerConfiguration } from "./configuration/issuerConfiguration";
 import { IssuerToken } from "./issuerToken";
 import { AnonymousIdentityToken } from "opcjs-base";
 

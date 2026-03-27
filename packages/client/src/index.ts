@@ -3,10 +3,11 @@
  */
 
 export * from './client.js'
-export * from './configurationClient.js'
+export * from './configuration/configurationClient.js'
 export * from './securityConfiguration.js'
 export * from './userIdentity.js'
 export * from './browseNodeResult.js'
 export * from './sessions/sessionInvalidError.js'
-export * from './callMethodArgument.js'
-export * from './callMethodResult.js'
+export * from './method/callMethodArgument.js'
+export * from './method/callMethodResult.js'
+export type { CreateSubscriptionOptions } from './services/subscriptionService.js'

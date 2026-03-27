@@ -11,7 +11,7 @@ import {
   registerTypeDecoders
 } from "opcjs-base";
 
-import type { SecurityConfiguration } from './securityConfiguration.js'
+import type { SecurityConfiguration } from '../securityConfiguration.js'
 
 export class ConfigurationClient extends Configuration {
   /**
