@@ -9,9 +9,9 @@
 | ✅ | Documentation – Core Capacities | Done | README – Core Capacities section documents SecureChannels, Sessions, ContinuationPoints, Subscriptions, etc. |
 | ✅ | Security Administration | Done | `SecurityConfiguration` type in `securityConfiguration.ts`. Enforced in `client.ts` (`allowSecurityPolicyNone`, `messageSecurityMode`) and `sessionHandler.ts` (`allowedUserTokenTypes`). `trustedCAs` / `unknownCertificatePolicy` stored for future cert-based security. |
 | ✅ | Session Client Auto Reconnect | Done | `withSessionRefresh()` in `client.ts` catches `SessionInvalidError` AND transport-level errors. On transport error it calls `reconnectAndReactivate()`: reopens the channel, tries `ActivateSession` on the existing session, and only creates a brand-new session if that fails. |
-| ⚠️ | Session Client Base | Partial | `CreateSession` ✅, `ActivateSession` ✅, **`CloseSession` ❌ not implemented** — `disconnect()` in `client.ts` is a stub. |
+| ✅ | Session Client Base | Done | `CreateSession` ✅, `ActivateSession` ✅, `CloseSession` ✅ — `disconnect()` in `client.ts` calls `sessionHandler.closeSession(true)` then tears down the SecureChannel and WebSocket. |
 | ✅ | Session Client General Service Behaviour | Done | Auth token, requestHandle, and serviceResult evaluation all handled in `serviceBase.ts`. |
-| ⚠️ | Session Client KeepAlive | Partial | Keep-alive only happens through the Publish loop. If no subscription is active, **nothing keeps the session alive**. A dedicated periodic keep-alive is required. |
+| ✅ | Session Client KeepAlive | Done | Dedicated `startKeepAlive()` timer in `client.ts` reads `Server_ServerStatus` (ns=0, i=2256) every 25 s. Skipped when a subscription's Publish loop is already active (`subscriptionHandler.hasActiveSubscription()`). Cancelled by `stopKeepAlive()` in `disconnect()`. |
 
 ## A. Core 2022 Client Facet — Optional Conformance Units
 
