@@ -6,7 +6,7 @@
 | Done | Conformance Unit | Status | Notes |
 |------|-----------------|--------|-------|
 | ✅ | Address Space Client NodeId IdTypes | Done | All 4 types (Numeric, String, Guid, Opaque) in `nodeId.ts` |
-| ❌ | Documentation – Core Capacities | Missing | Document number of supported SecureChannels, Sessions, ContinuationPoints, Subscriptions, etc. |
+| ✅ | Documentation – Core Capacities | Done | README – Core Capacities section documents SecureChannels, Sessions, ContinuationPoints, Subscriptions, etc. |
 | ✅ | Security Administration | Done | `SecurityConfiguration` type in `securityConfiguration.ts`. Enforced in `client.ts` (`allowSecurityPolicyNone`, `messageSecurityMode`) and `sessionHandler.ts` (`allowedUserTokenTypes`). `trustedCAs` / `unknownCertificatePolicy` stored for future cert-based security. |
 | ✅ | Session Client Auto Reconnect | Done | `withSessionRefresh()` in `client.ts` catches `SessionInvalidError` AND transport-level errors. On transport error it calls `reconnectAndReactivate()`: reopens the channel, tries `ActivateSession` on the existing session, and only creates a brand-new session if that fails. |
 | ⚠️ | Session Client Base | Partial | `CreateSession` ✅, `ActivateSession` ✅, **`CloseSession` ❌ not implemented** — `disconnect()` in `client.ts` is a stub. |
@@ -63,7 +63,7 @@
 | ❌ | Time Sync – IEEE 1588 PTP *(optional)* | |
 | ❌ | Time Sync – IEEE 802.1AS *(optional)* | |
 | ❌ | Time Sync – NTP *(optional)* | |
-| ⚠️ | Time Sync – OS based support *(optional)* | Implicitly satisfied if running on an OS with NTP, but not documented or explicitly claimed. Cheapest path to satisfying "Time Sync – Support". |
+| ✅ | Time Sync – OS based support *(optional)* | Documented in README – Time Synchronisation section; satisfies the required "Time Sync – Support" CU. |
 | ❌ | Time Sync – UA based support *(optional)* | |
 
 ---
@@ -83,8 +83,8 @@
 - [x] **CloseSession** — implement `CloseSessionRequest` in `sessionService.ts` and wire into `client.disconnect()`.
 - [x] **Session KeepAlive without subscriptions** — add a dedicated keep-alive timer that reads `Server_ServerStatus` (or a similar cheap node) at regular intervals when no subscription is active.
 - [x] **Auto Reconnect – ActivateSession on existing session** — when the SecureChannel drops but the session timeout has not expired, attempt `ActivateSession` on a new channel before creating a brand-new session.
-- [ ] **Documentation – Core Capacities** — add a section to the README stating the supported number of SecureChannels, Sessions, ContinuationPoints, etc.
-- [ ] **Time Sync – OS based support (claim)** — document that the client relies on the OS system clock (NTP / systemd-timesyncd) so the "Time Sync – Support" required CU is satisfied.
+- [x] **Documentation – Core Capacities** — add a section to the README stating the supported number of SecureChannels, Sessions, ContinuationPoints, etc.
+- [x] **Time Sync – OS based support (claim)** — document that the client relies on the OS system clock (NTP / systemd-timesyncd) so the "Time Sync – Support" required CU is satisfied.
 
 ### P1 — Required conformance units (substantial gaps)
 
