@@ -1,24 +1,35 @@
-# Release workflow — manually triggered to create a GitHub release and publish packages to npm.
+# Release workflow — manually triggered to compute the version, build, and publish packages to npm.
 #
-# Run this after the CI workflow has built and bumped versions on the target branch.
+# The version is derived entirely from the branch name:
 #
-# Inputs:
-#   ref  - Branch to release from (e.g. 'main' for stable, 'alpha/v0.1' for prerelease).
-#          The version already in each package.json on that branch is used as-is.
+#   Stable:     v<MAJOR>.<MINOR>          (e.g. v0.1)
+#               Published as: <MAJOR>.<MINOR>.<NEXT>          npm tag: latest
 #
-# npm dist-tag logic:
-#   ref = main    -> --tag latest  (stable)
-#   ref = */v*    -> --tag <channel>  (e.g. alpha/v0.1 -> --tag alpha)
+#   Prerelease: v<MAJOR>.<MINOR>-<CHANNEL> (e.g. v0.1-alpha)
+#               Published as: <MAJOR>.<MINOR>.<NEXT>-<CHANNEL> npm tag: <CHANNEL>
+#
+# NEXT is determined by querying npmjs for the highest existing patch number in the
+# same MAJOR.MINOR series (and same CHANNEL for prereleases), then incrementing by 1.
+# If no matching version exists yet, NEXT starts at 0.
+#
+# package.json files always contain "0.0.0" in git — versions are set in-place during
+# this workflow and never committed back.
+#
+# Steps:
+#   1. Validate the branch name and extract MAJOR, MINOR, CHANNEL.
+#   2. Discover publishable packages (have "prepublish" script, not in EXCLUDED_PACKAGES).
+#   3. Install dependencies.
+#   4. Compute the next free patch version per package by querying npmjs.
+#   5. Set the computed version in each package.json (no commit).
+#   6. Build all packages via "prepublish" (lint + typecheck + build + unit tests).
+#   7. Dry-run publish all packages — abort if any would fail.
+#   8. Publish all packages to npm with --tag <CHANNEL>.
+#   9. Create a GitHub release and git tag.
 
 name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      ref:
-        description: 'Branch to release from (e.g. main, alpha/v0.1)'
-        required: true
-        default: 'main'
 
 permissions:
   contents: write
@@ -34,14 +45,42 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-        with:
-          ref: ${{ inputs.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 'lts/*'
           registry-url: 'https://registry.npmjs.org/'
+
+      - name: Validate branch name and extract version components
+        id: ver
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          if [[ "$BRANCH" =~ ^v([0-9]+)\.([0-9]+)-([a-zA-Z][a-zA-Z0-9]*)$ ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            CHANNEL="${BASH_REMATCH[3]}"
+            IS_PRERELEASE=true
+            NPM_TAG="${CHANNEL}"
+            echo "Branch '${BRANCH}' parsed: MAJOR=${MAJOR} MINOR=${MINOR} CHANNEL=${CHANNEL} (prerelease)"
+          elif [[ "$BRANCH" =~ ^v([0-9]+)\.([0-9]+)$ ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            CHANNEL=""
+            IS_PRERELEASE=false
+            NPM_TAG=latest
+            echo "Branch '${BRANCH}' parsed: MAJOR=${MAJOR} MINOR=${MINOR} (stable)"
+          else
+            echo "ERROR: Branch '${BRANCH}' does not match a supported release branch format."
+            echo "       Stable:     v<MAJOR>.<MINOR>            e.g. v0.1"
+            echo "       Prerelease: v<MAJOR>.<MINOR>-<CHANNEL>  e.g. v0.1-alpha"
+            exit 1
+          fi
+          echo "major=${MAJOR}"             >> "$GITHUB_OUTPUT"
+          echo "minor=${MINOR}"             >> "$GITHUB_OUTPUT"
+          echo "channel=${CHANNEL}"         >> "$GITHUB_OUTPUT"
+          echo "npm_tag=${NPM_TAG}"         >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=${IS_PRERELEASE}" >> "$GITHUB_OUTPUT"
 
       - name: Discover publishable packages
         id: packages
@@ -65,6 +104,63 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Compute next version for each package
+        id: compute_versions
+        run: |
+          MAJOR="${{ steps.ver.outputs.major }}"
+          MINOR="${{ steps.ver.outputs.minor }}"
+          CHANNEL="${{ steps.ver.outputs.channel }}"
+          IS_PRERELEASE="${{ steps.ver.outputs.is_prerelease }}"
+          VERSIONS_FILE="$GITHUB_WORKSPACE/.versions.env"
+          > "$VERSIONS_FILE"
+
+          for pkg in ${{ steps.packages.outputs.list }}; do
+            PKG_NAME=$(node -p "require('./packages/${pkg}/package.json').name")
+            echo "Querying npmjs for ${PKG_NAME} versions..."
+
+            # Fetch all published versions; fall back to empty array if package is unpublished.
+            ALL_VERSIONS=$(npm view "${PKG_NAME}" versions --json 2>/dev/null || echo "[]")
+
+            if [[ "$IS_PRERELEASE" == "true" ]]; then
+              # Prerelease: match <MAJOR>.<MINOR>.<patch>-<CHANNEL>
+              NEXT_PATCH=$(node -e "
+                const versions = ${ALL_VERSIONS};
+                const prefix = '${MAJOR}.${MINOR}.';
+                const suffix = '-${CHANNEL}';
+                const patches = versions
+                  .filter(v => v.startsWith(prefix) && v.endsWith(suffix))
+                  .map(v => parseInt(v.slice(prefix.length, v.length - suffix.length), 10))
+                  .filter(n => !isNaN(n));
+                console.log(patches.length > 0 ? Math.max(...patches) + 1 : 0);
+              ")
+              NEW_VER="${MAJOR}.${MINOR}.${NEXT_PATCH}-${CHANNEL}"
+            else
+              # Stable: match <MAJOR>.<MINOR>.<patch> with no prerelease suffix
+              NEXT_PATCH=$(node -e "
+                const versions = ${ALL_VERSIONS};
+                const prefix = '${MAJOR}.${MINOR}.';
+                const patches = versions
+                  .filter(v => v.startsWith(prefix) && !v.includes('-'))
+                  .map(v => parseInt(v.slice(prefix.length), 10))
+                  .filter(n => !isNaN(n));
+                console.log(patches.length > 0 ? Math.max(...patches) + 1 : 0);
+              ")
+              NEW_VER="${MAJOR}.${MINOR}.${NEXT_PATCH}"
+            fi
+            echo "  ${PKG_NAME}: next version = ${NEW_VER}"
+            echo "${pkg}_version=${NEW_VER}" >> "$VERSIONS_FILE"
+          done
+
+      - name: Set versions in package.json files (no commit)
+        run: |
+          source "$GITHUB_WORKSPACE/.versions.env"
+          for pkg in ${{ steps.packages.outputs.list }}; do
+            ver_key="${pkg}_version"
+            new_ver="${!ver_key}"
+            echo "Setting packages/${pkg} version to ${new_ver}"
+            npm version "${new_ver}" --no-git-tag-version --prefix "packages/${pkg}"
+          done
+
       - name: Build all packages
         run: |
           for pkg in ${{ steps.packages.outputs.list }}; do
@@ -72,22 +168,33 @@ jobs:
             npm run prepublish --prefix "packages/${pkg}"
           done
 
-      - name: Determine release metadata
+      - name: Dry-run publish (pre-check — no packages are published yet)
+        run: |
+          NPM_TAG="${{ steps.ver.outputs.npm_tag }}"
+          echo "=== Dry-run publish to verify all packages before any real publish ==="
+          for pkg in ${{ steps.packages.outputs.list }}; do
+            echo "--- dry-run: packages/${pkg} ---"
+            (cd "packages/${pkg}" && npm publish --dry-run --tag "${NPM_TAG}")
+          done
+          echo "=== Dry-run completed successfully for all packages ==="
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish all packages to npm
+        run: |
+          NPM_TAG="${{ steps.ver.outputs.npm_tag }}"
+          for pkg in ${{ steps.packages.outputs.list }}; do
+            echo "=== publishing: packages/${pkg} ==="
+            (cd "packages/${pkg}" && npm publish --tag "${NPM_TAG}")
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Determine release tag
         id: meta
         run: |
-          REF="${{ inputs.ref }}"
-          if [[ "$REF" == "main" ]]; then
-            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
-            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
-          else
-            # e.g. alpha/v0.1 -> channel = alpha
-            CHANNEL="${REF%%/*}"
-            echo "npm_tag=${CHANNEL}" >> "$GITHUB_OUTPUT"
-            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
-          fi
-          # Use the base package version as the release tag.
-          VERSION=$(node -p "require('./packages/base/package.json').version")
-          echo "release_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          BASE_VER=$(node -p "require('./packages/base/package.json').version")
+          echo "release_tag=v${BASE_VER}" >> "$GITHUB_OUTPUT"
 
       - name: Build release body
         id: body
@@ -105,26 +212,12 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
+        if: steps.ver.outputs.is_prerelease == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name:               ${{ steps.meta.outputs.release_tag }}
           name:                   ${{ steps.meta.outputs.release_tag }}
-          prerelease:             ${{ steps.meta.outputs.is_prerelease }}
+          prerelease:             ${{ steps.ver.outputs.is_prerelease }}
           generate_release_notes: true
           body:                   ${{ steps.body.outputs.text }}
-          target_commitish:       ${{ inputs.ref }}
-
-      - name: Publish all packages to npm
-        run: |
-          for pkg in ${{ steps.packages.outputs.list }}; do
-            echo "=== publishing: packages/${pkg} ==="
-            cd "packages/${pkg}"
-            if [[ "${{ steps.meta.outputs.npm_tag }}" == "latest" ]]; then
-              npm publish
-            else
-              npm publish --tag "${{ steps.meta.outputs.npm_tag }}"
-            fi
-            cd "$GITHUB_WORKSPACE"
-          done
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          target_commitish:       ${{ github.ref_name }}
