@@ -24,12 +24,19 @@ export abstract class ServiceBase {
         throw new Error(`${context} failed: ${StatusCodeToString(result)} (${StatusCodeToStringNumber(result)})`)
     }
 
-    protected createRequestHeader(): RequestHeader {
+    /**
+     * Builds a RequestHeader for an outgoing service request.
+     *
+     * @param returnDiagnostics - Bitmask of diagnostic fields to request from the
+     *   server (OPC UA Part 4, §7.15). Use {@link ReturnDiagnosticsMask} constants
+     *   to compose the value. Default `0` = no diagnostics.
+     */
+    protected createRequestHeader(returnDiagnostics = 0): RequestHeader {
         const requestHeader = new RequestHeader();
         requestHeader.authenticationToken = this.authToken;
         requestHeader.timestamp = new Date();
         requestHeader.requestHandle = 0; // will be set by secure channel
-        requestHeader.returnDiagnostics = 0;
+        requestHeader.returnDiagnostics = returnDiagnostics;
         requestHeader.auditEntryId = '';
         requestHeader.timeoutHint = 60000;
         requestHeader.additionalHeader = ExtensionObject.newEmpty();

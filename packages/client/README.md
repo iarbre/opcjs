@@ -50,23 +50,24 @@ Reconnects automatically on channel drops (Session Auto Reconnect, OPC UA Part 4
 
 Sends `CloseSession` (with `deleteSubscriptions=true`), closes the SecureChannel, and shuts down the WebSocket transport.
 
-### `client.read(ids): Promise<ReadValueResult[]>`
+### `client.read(ids, options?): Promise<ReadValueResult[]>`
 
 Reads the `Value` attribute of one or more nodes.
 
 ```ts
 const [result] = await client.read([NodeId.newNumeric(0, 2258)])
-// result.value  — the read value
-// result.statusCode — OPC UA StatusCode
+// result.value          — the read value
+// result.statusCode     — OPC UA StatusCode
+// result.diagnosticInfo — populated when returnDiagnostics > 0
 ```
 
-### `client.browse(nodeId, recursive?): Promise<BrowseNodeResult[]>`
+### `client.browse(nodeId, recursive?, options?): Promise<BrowseNodeResult[]>`
 
 Browses the `HierarchicalReferences` of a node. Set `recursive` to `true` to traverse the full sub-tree.
 
 Continuation points are handled automatically: all pages are fetched and merged before the promise resolves.
 
-### `client.callMethod(objectId, methodId, inputArguments?): Promise<CallMethodResult>`
+### `client.callMethod(objectId, methodId, inputArguments?, options?): Promise<CallMethodResult>`
 
 Calls an OPC UA method.
 
@@ -78,8 +79,9 @@ const result = await client.callMethod(
   NodeId.newNumeric(0, 1001),  // Method node
   [42, 'hello'] as CallMethodArgument[],
 )
-// result.values    — output argument values
-// result.statusCode — OPC UA StatusCode
+// result.values         — output argument values
+// result.statusCode     — OPC UA StatusCode
+// result.diagnosticInfo — populated when returnDiagnostics > 0
 ```
 
 ### `client.subscribe(ids, callback, options?): Promise<void>`
@@ -151,6 +153,59 @@ config.securityConfiguration = {
 
 > **Security note:** `allowSecurityPolicyNone: true` (the default) allows cleartext communication. Set it to `false` once non-None security policies are available in this client implementation.
 
+## Request Options
+
+All service methods (`read`, `callMethod`, `browse`) accept an optional `RequestOptions` object as their last parameter.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `returnDiagnostics` | `number` | `0` | Bitmask of diagnostic fields the server should populate (OPC UA Part 4, §7.15). Use `ReturnDiagnosticsMask` constants to compose the value. |
+
+### `ReturnDiagnosticsMask` constants
+
+```ts
+import { ReturnDiagnosticsMask } from 'opcjs-client'
+```
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `ServiceLevel` | `0x001f` | All service-level fields |
+| `OperationLevel` | `0x03e0` | All operation-level fields |
+| `All` | `0x03ff` | All diagnostic fields |
+| `ServiceSymbolicId` | `0x0001` | Service symbolic identifier |
+| `ServiceLocalizedText` | `0x0002` | Service localised text |
+| `ServiceAdditionalInfo` | `0x0004` | Service additional info |
+| `ServiceInnerStatusCode` | `0x0008` | Service inner status code |
+| `ServiceInnerDiagnostics` | `0x0010` | Service inner diagnostic info |
+| `OperationSymbolicId` | `0x0020` | Operation symbolic identifier |
+| `OperationLocalizedText` | `0x0040` | Operation localised text |
+| `OperationAdditionalInfo` | `0x0080` | Operation additional info |
+| `OperationInnerStatusCode` | `0x0100` | Operation inner status code |
+| `OperationInnerDiagnostics` | `0x0200` | Operation inner diagnostic info |
+
+### Example
+
+```ts
+import { ReturnDiagnosticsMask } from 'opcjs-client'
+
+const [result] = await client.read(
+  [NodeId.newNumeric(0, 2258)],
+  { returnDiagnostics: ReturnDiagnosticsMask.All },
+)
+if (result.diagnosticInfo) {
+  console.log('additional info:', result.diagnosticInfo.additionalInfo)
+}
+
+const callResult = await client.callMethod(
+  objectId,
+  methodId,
+  [],
+  { returnDiagnostics: ReturnDiagnosticsMask.OperationLevel },
+)
+```
+
+When `returnDiagnostics` is `0` (the default) the `diagnosticInfo` field on each result is `undefined`.
+
 ## Core Capacities
 
 This section satisfies the **Documentation – Core Capacities** conformance unit (OPC UA Core 2022 Client Facet, §A).
@@ -181,6 +236,7 @@ No application-level time-sync mechanism (IEEE 1588 PTP, IEEE 802.1AS, UA-based 
 |-----------------|--------|
 | Address Space Client NodeId IdTypes | ✅ Done |
 | Documentation – Core Capacities | ✅ Done (see above) |
+| Base Services Client Diagnostics | ✅ Done (`RequestOptions.returnDiagnostics`, `ReturnDiagnosticsMask`) |
 | Security Administration | ✅ Done (`SecurityConfiguration`) |
 | Session Client Auto Reconnect | ✅ Done |
 | Session Client Base (`CloseSession`) | ✅ Done |

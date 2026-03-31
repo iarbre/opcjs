@@ -20,7 +20,7 @@
 | ❌ | Base Info Client Currency | Not impl | No CurrencyUnit Property handling |
 | ❌ | Base Info Client Estimated Return Time | Not impl | Reconnect logic does not read the EstimatedReturnTime property |
 | ❌ | Base Info Client Selection List | Not impl | No SelectionListType awareness |
-| ❌ | Base Services Client Diagnostics | Not impl | `returnDiagnostics = 0` hardcoded everywhere; DiagnosticInfo types exist but are unused |
+| ✅ | Base Services Client Diagnostics | Done | `returnDiagnostics` field on `RequestOptions`; callers pass it to `read()`, `callMethod()`, and `browse()`. Diagnostic info is returned in `ReadValueResult.diagnosticInfo` and `CallMethodResult.diagnosticInfo`. |
 | ❌ | Security Admin – Certificate Management | Not impl | No cert store / trust list management |
 | ❌ | Session Client Cancel | Not impl | CancelRequest type exists in schema but there is no client-level API |
 | ❌ | Session Client Detect Shutdown | Not impl | No ServerStatus/State monitoring |
@@ -92,7 +92,7 @@
 
 ### P2 — Optional conformance units (nice to have)
 
-- [ ] **Service diagnostics** — expose `returnDiagnostics` in the request options so callers can request diagnostic info.
+- [x] **Service diagnostics** — expose `returnDiagnostics` in the request options so callers can request diagnostic info.
 - [ ] **Session Cancel** — expose `CancelRequest` as a client API.
 - [ ] **Detect Server Shutdown** — monitor `ServerStatus/State` and trigger a reconnect when a server shutdown is announced.
 - [ ] **Session Impersonate** — add an explicit `impersonate(identity)` method that calls `ActivateSession` with a different identity token.

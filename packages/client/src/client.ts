@@ -43,6 +43,7 @@ import { CallMethodResult } from './method/callMethodResult.js'
 import { BrowseService } from './services/browseService.js'
 import { BrowseNodeResult } from './browseNodeResult.js'
 import { CallMethodArgument } from './method/callMethodArgument.js'
+import type { RequestOptions } from './requestOptions.js'
 
 /** NodeId of Server_ServerStatus (ns=0, i=2256) — a cheap server-side read used for session keep-alive. */
 const SERVER_STATUS_NODE_ID = NodeId.newNumeric(0, 2256)
@@ -353,10 +354,10 @@ export class Client {
     this.logger.info('Disconnected.')
   }
 
-  async read(ids: NodeId[]): Promise<ReadValueResult[]> {
+  async read(ids: NodeId[], options?: RequestOptions): Promise<ReadValueResult[]> {
     return this.withSessionRefresh(async () => {
-      const result = await this.attributeService?.ReadValue(ids)
-      return result?.map(r => new ReadValueResult(r.value, r.statusCode)) ?? []
+      const result = await this.attributeService?.ReadValue(ids, 0, undefined, options?.returnDiagnostics)
+      return result?.map(r => new ReadValueResult(r.value, r.statusCode, r.diagnosticInfo)) ?? []
     })
   }
 
@@ -365,12 +366,14 @@ export class Client {
    * @param objectId - NodeId of the Object that owns the method.
    * @param methodId - NodeId of the Method to invoke.
    * @param inputArguments - Input argument Variants (default: empty).
+   * @param options - Request options (e.g. `returnDiagnostics`).
    * @returns The CallMethodResult for the invoked method.
    */
   async callMethod(
     objectId: NodeId,
     methodId: NodeId,
-    inputArguments: CallMethodArgument[] = []
+    inputArguments: CallMethodArgument[] = [],
+    options?: RequestOptions,
   ): Promise<CallMethodResult> {
     return this.withSessionRefresh(async () => {
       const request = new CallMethodRequest()
@@ -378,19 +381,20 @@ export class Client {
       request.methodId = methodId
       request.inputArguments = inputArguments.map(arg => Variant.newFrom(arg as Parameters<typeof Variant.newFrom>[0]))
 
-      const responses = await this.methodService!.call([request])
+      const responses = await this.methodService!.call([request], options?.returnDiagnostics)
       const response = responses[0]
-      return new CallMethodResult(response.value, response.statusCode)
+      return new CallMethodResult(response.value, response.statusCode, response.diagnosticInfo)
     })
   }
 
   async browse(
     nodeId: NodeId,
     recursive: boolean = false,
+    options?: RequestOptions,
   ): Promise<BrowseNodeResult[]> {
     return this.withSessionRefresh(() => {
       const visited = new Set<string>()
-      return this.browseRecursive(nodeId, recursive, visited)
+      return this.browseRecursive(nodeId, recursive, visited, options?.returnDiagnostics ?? 0)
     })
   }
 
@@ -398,6 +402,7 @@ export class Client {
     nodeId: NodeId,
     recursive: boolean,
     visited: Set<string>,
+    returnDiagnostics: number,
   ): Promise<BrowseNodeResult[]> {
     const nodeKey = `${nodeId.namespace}:${nodeId.identifier}`;
     if (visited.has(nodeKey)) {
@@ -413,14 +418,14 @@ export class Client {
     description.nodeClassMask = 0; // all node classes
     description.resultMask = BrowseResultMaskEnum.All;
 
-    const browseResults = await this.browseService!.browse([description]);
+    const browseResults = await this.browseService!.browse([description], returnDiagnostics);
     const browseResult = browseResults[0];
     const allReferences = [...(browseResult.references ?? [])];
 
     let continuationPoint = browseResult.continuationPoint;
     while (continuationPoint && continuationPoint.byteLength > 0) {
       const nextResults = await this.browseService!
-        .browseNext([continuationPoint], false);
+        .browseNext([continuationPoint], false, returnDiagnostics);
       const nextResult = nextResults[0];
       allReferences.push(...(nextResult.references ?? []));
       continuationPoint = nextResult.continuationPoint;
@@ -445,7 +450,7 @@ export class Client {
           ref.nodeId.nodeId.identifier as number,
         );
         const childResults = await this.browseRecursive(
-          childNodeId, true, visited,
+          childNodeId, true, visited, returnDiagnostics,
         );
         results.push(...childResults);
       }

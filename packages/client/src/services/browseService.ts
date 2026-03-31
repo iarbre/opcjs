@@ -13,16 +13,17 @@ export class BrowseService extends ServiceBase {
   /**
    * Browses one or more Nodes and returns their References (OPC UA Part 4, Section 5.9.2).
    * @param nodesToBrowse - Array of BrowseDescriptions specifying nodes and filter criteria.
+   * @param returnDiagnostics - Bitmask of diagnostic fields to request (OPC UA Part 4, §7.15). Default: 0.
    * @returns Array of BrowseResult, one per requested node.
    */
-  async browse(nodesToBrowse: BrowseDescription[]): Promise<BrowseResult[]> {
+  async browse(nodesToBrowse: BrowseDescription[], returnDiagnostics = 0): Promise<BrowseResult[]> {
     const view = new ViewDescription();
     view.viewId = NodeId.newNumeric(0, 0);
     view.timestamp = new Date(-11644473600000); // OPC UA MinDateTime (ticks=0)
     view.viewVersion = 0;
 
     const request = new BrowseRequest();
-    request.requestHeader = this.createRequestHeader();
+    request.requestHeader = this.createRequestHeader(returnDiagnostics);
     request.view = view;
     request.requestedMaxReferencesPerNode = 0;
     request.nodesToBrowse = nodesToBrowse;
@@ -40,14 +41,16 @@ export class BrowseService extends ServiceBase {
    * Continues a Browse operation using continuation points (OPC UA Part 4, Section 5.9.3).
    * @param continuationPoints - Continuation points returned by a prior Browse or BrowseNext call.
    * @param releaseContinuationPoints - If true, releases the continuation points without returning results.
+   * @param returnDiagnostics - Bitmask of diagnostic fields to request (OPC UA Part 4, §7.15). Default: 0.
    * @returns Array of BrowseResult, one per continuation point.
    */
   async browseNext(
     continuationPoints: UaByteString[],
     releaseContinuationPoints: boolean,
+    returnDiagnostics = 0,
   ): Promise<BrowseResult[]> {
     const request = new BrowseNextRequest();
-    request.requestHeader = this.createRequestHeader();
+    request.requestHeader = this.createRequestHeader(returnDiagnostics);
     request.releaseContinuationPoints = releaseContinuationPoints;
     request.continuationPoints = continuationPoints;
 

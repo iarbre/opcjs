@@ -1,4 +1,4 @@
-import { CallMethodRequest, CallRequest, CallResponse, getLogger, ISecureChannel, NodeId, StatusCode } from 'opcjs-base'
+import { CallMethodRequest, CallRequest, CallResponse, DiagnosticInfo, getLogger, ISecureChannel, NodeId, StatusCode } from 'opcjs-base'
 
 import { ServiceBase } from './serviceBase.js'
 
@@ -9,11 +9,16 @@ export class MethodService extends ServiceBase {
     /**
      * Calls one or more methods on the server (OPC UA Part 4, Section 5.11.2).
      * @param methodsToCall - Array of CallMethodRequest describing each method to invoke.
-     * @returns Array of results containing output argument values and raw status code number, one per requested method.
+     * @param returnDiagnostics - Bitmask of diagnostic fields to request (OPC UA Part 4, §7.15). Default: 0.
+     * @returns Array of results containing output argument values, raw status code, and optional diagnostic info,
+     *   one per requested method.
      */
-    async call(methodsToCall: CallMethodRequest[]): Promise<{ statusCode: number, value: unknown[] }[]> {
+    async call(
+        methodsToCall: CallMethodRequest[],
+        returnDiagnostics = 0,
+    ): Promise<{ statusCode: number, value: unknown[], diagnosticInfo?: DiagnosticInfo }[]> {
         const request = new CallRequest();
-        request.requestHeader = this.createRequestHeader();
+        request.requestHeader = this.createRequestHeader(returnDiagnostics);
         request.methodsToCall = methodsToCall;
 
         this.logger.debug("Sending CallRequest...");
@@ -21,9 +26,11 @@ export class MethodService extends ServiceBase {
 
         this.checkServiceResult(response.responseHeader?.serviceResult, 'CallRequest')
 
-        return response.results.map(result => ({
+        const diagInfos = response.diagnosticInfos ?? []
+        return response.results.map((result, i) => ({
             statusCode: result.statusCode ?? StatusCode.Good,
             value: result.outputArguments.map(arg => arg.value),
+            diagnosticInfo: diagInfos[i],
         }));
     }
 
