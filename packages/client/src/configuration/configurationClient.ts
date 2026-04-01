@@ -32,6 +32,18 @@ export class ConfigurationClient extends Configuration {
    * re-connect.  Defaults to 5 000 ms.
    */
   public shutdownReconnectDelayMs = 5_000
+
+  /**
+   * Minimum reconnect delay in milliseconds used when
+   * `Server/ServerStatus/EstimatedReturnTime` is already in the past (the server
+   * should already be available again).
+   *
+   * Also acts as the lower bound for the ERT-derived delay, ensuring the client
+   * always waits at least this long before retrying.
+   *
+   * Defaults to 1 000 ms.
+   */
+  public minReconnectDelayMs = 1_000
   public static getSimple(
     name: string,
     company: string,

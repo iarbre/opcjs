@@ -2,7 +2,7 @@
 
 **Facet**: Core 2022 Client Facet  
 **Type**: Optional  
-**Status**: ❌ Not implemented  
+**Status**: ✅ Implemented  
 
 ## Description
 
@@ -36,16 +36,45 @@ When the server announces a shutdown (`ServerStatus/State = Shutdown`) the clien
 
 Online: https://reference.opcfoundation.org/Core/Part5/v105/docs/12.6
 
-## Implementation Gap
+## Implementation
 
-The reconnect logic in `src/client.ts` (`reconnectAndReactivate()`) retries immediately without reading `EstimatedReturnTime`.
+✅ Implemented.
 
-## Work Required
+### `Client.computeReconnectDelayMs()` (private, `src/client.ts`)
 
-1. In `reconnectAndReactivate()`, after a transport error, attempt to read `Server/ServerStatus/EstimatedReturnTime` before closing.
-2. Parse the `DateTime` value and delay the reconnect attempt accordingly.
-3. Expose a callback / event so the application can react to `MinDateTime` (permanent shutdown).
-4. Integration tests against the reference server's graceful-shutdown flow.
+Reads `Server/ServerStatus/EstimatedReturnTime` (ns=0, i=2992) after shutdown is detected and
+returns the reconnect delay:
+
+| Server response | Client behaviour |
+|---|---|
+| Valid future `DateTime` | delay = `EstimatedReturnTime − now` |
+| Past `DateTime` | delay = 1 s (server should already be back) |
+| OPC UA `MinDateTime` (1601-01-01) | returns `null` → fire `onPermanentShutdown`, no reconnect |
+| `null` / non-Date / read error | fall back to `configuration.shutdownReconnectDelayMs` |
+
+### `Client.handleServerShutdownDetected()` (private)
+
+Now calls `computeReconnectDelayMs()` before scheduling the reconnect `setTimeout`.
+When `null` is returned, fires `Client.onPermanentShutdown?.()` without scheduling a reconnect.
+
+### `Client.onPermanentShutdown?: () => void` (public)
+
+Fires when the server sends `MinDateTime` for `EstimatedReturnTime`, indicating it will not
+restart. The application layer is responsible for deciding whether to re-use or dispose the
+`Client` instance.
+
+### Constants added
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `ESTIMATED_RETURN_TIME_NODE_ID` | `ns=0; i=2992` | Node to read |
+| `OPC_UA_MIN_DATE_TIME_MS` | `-11_644_473_600_000` | MinDateTime in JS epoch ms |
+| `MIN_RECONNECT_DELAY_MS` | `1_000` | Minimum delay when ERT is in the past |
+
+### Tests
+
+`tests/unit/estimatedReturnTime.test.ts` — 11 tests covering `computeReconnectDelayMs` and the
+full `handleServerShutdownDetected` integration path.
 
 ## Related Conformance Units
 

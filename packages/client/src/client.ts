@@ -53,11 +53,18 @@ import { NamespaceTable } from './namespaceTable.js'
 const SERVER_STATUS_NODE_ID = NodeId.newNumeric(0, 2256)
 /** NodeId of Server.NamespaceArray (ns=0, i=2255) — tracked to implement Session Client Renew NodeIds. */
 const NAMESPACE_ARRAY_NODE_ID = NodeId.newNumeric(0, 2255)
+/** NodeId of Server/ServerStatus/EstimatedReturnTime (ns=0, i=2992). */
+const ESTIMATED_RETURN_TIME_NODE_ID = NodeId.newNumeric(0, 2992)
 /**
  * How often to read the server when no subscription is active (ms).
  * Must be shorter than the server's revisedSessionTimeout (default: 60 000 ms).
  */
 const KEEP_ALIVE_INTERVAL_MS = 25_000
+/**
+ * OPC UA MinDateTime decoded as a JS Date timestamp (ms since Unix epoch).
+ * A server that sends MinDateTime for EstimatedReturnTime does not expect to restart.
+ */
+const OPC_UA_MIN_DATE_TIME_MS = -11_644_473_600_000
 
 
 export class Client {
@@ -93,6 +100,23 @@ export class Client {
    * ```
    */
   onNamespaceTableChanged?: (oldTable: NamespaceTable, newTable: NamespaceTable) => void
+
+  /**
+   * Called when the server sends `EstimatedReturnTime = MinDateTime`, indicating it does not
+   * expect to restart (OPC UA Part 5, Section 12.6 — Base Info Client Estimated Return Time
+   * conformance unit).
+   *
+   * When this fires the automatic reconnect is suppressed. The application is responsible for
+   * deciding whether to keep the `Client` instance or dispose it.
+   *
+   * @example
+   * ```ts
+   * client.onPermanentShutdown = () => {
+   *   console.warn('Server will not restart — closing client.')
+   * }
+   * ```
+   */
+  onPermanentShutdown?: () => void
 
   getSession(): Session {
     if (!this.session) {
@@ -249,34 +273,88 @@ export class Client {
    * returning `ServerStateEnum.Shutdown` or via a subscription `StatusChangeNotification`
    * with status `BadShutdown` / `BadServerHalted`.
    *
-   * Stops the keep-alive timer, waits for `SHUTDOWN_RECONNECT_DELAY_MS` to allow the server
-   * process to exit, then invokes `reconnectAndReactivate()`.  Only one reconnect attempt is
-   * scheduled at a time; a second detection while one is already pending is silently ignored.
+   * Reads `Server/ServerStatus/EstimatedReturnTime` (ns=0, i=2992) to decide how long to
+   * wait before reconnecting (Base Info Client Estimated Return Time conformance unit).
+   * Falls back to `configuration.shutdownReconnectDelayMs` when the read fails or the
+   * attributed service is not yet available.  Fires `onPermanentShutdown` and suppresses the
+   * reconnect when the server sends `MinDateTime`.
+   *
+   * Only one reconnect attempt is scheduled at a time; a second detection while one is already
+   * pending is silently ignored.
    */
   private handleServerShutdownDetected(): void {
     if (this.shutdownReconnectPending) {
       return
     }
     this.shutdownReconnectPending = true
-    const delay = this.configuration.shutdownReconnectDelayMs
-    this.logger.warn(
-      `Server shutdown detected. Scheduling reconnect in ${delay} ms...`,
-    )
     this.stopKeepAlive()
-    setTimeout(() => {
-      void this.reconnectAndReactivate()
-        .then(() => {
-          this.initServices()
-          this.startKeepAlive()
-          this.logger.info('Reconnected after server shutdown.')
-        })
-        .catch((err) => {
-          this.logger.warn('Reconnect after server shutdown failed:', err)
-        })
-        .finally(() => {
-          this.shutdownReconnectPending = false
-        })
-    }, delay)
+    this.logger.warn('Server shutdown detected; reading EstimatedReturnTime...')
+    void this.computeReconnectDelayMs().then((delayMs) => {
+      if (delayMs === null) {
+        this.logger.warn(
+          'Server indicated it will not restart (MinDateTime). Firing onPermanentShutdown.',
+        )
+        this.onPermanentShutdown?.()
+        this.shutdownReconnectPending = false
+        return
+      }
+      this.logger.warn(`Scheduling reconnect in ${delayMs} ms...`)
+      setTimeout(() => {
+        void this.reconnectAndReactivate()
+          .then(() => {
+            this.initServices()
+            this.startKeepAlive()
+            this.logger.info('Reconnected after server shutdown.')
+          })
+          .catch((err) => {
+            this.logger.warn('Reconnect after server shutdown failed:', err)
+          })
+          .finally(() => {
+            this.shutdownReconnectPending = false
+          })
+      }, delayMs)
+    })
+  }
+
+  /**
+   * Reads `Server/ServerStatus/EstimatedReturnTime` (ns=0, i=2992) and returns the reconnect
+   * delay in milliseconds (Base Info Client Estimated Return Time — OPC UA Part 5, §12.6):
+   *
+   * - Valid future `DateTime` → delay = `estimatedReturnTime − now`, clamped to at least
+   *   `MIN_RECONNECT_DELAY_MS`.
+   * - Past `DateTime` (server should already be available) → `MIN_RECONNECT_DELAY_MS`.
+   * - OPC UA `MinDateTime` (server will not restart) → `null`.
+   * - Unreadable / unavailable → falls back to `configuration.shutdownReconnectDelayMs`.
+   */
+  private async computeReconnectDelayMs(): Promise<number | null> {
+    if (!this.attributeService) {
+      return this.configuration.shutdownReconnectDelayMs
+    }
+    try {
+      const results = await this.attributeService.ReadValue([ESTIMATED_RETURN_TIME_NODE_ID])
+      // Navigate through the Variant wrapper: results[0].value is a Variant whose .value is the Date.
+      const variant = results[0]?.value as { value?: unknown } | undefined
+      const estimatedReturnTime = variant?.value
+      if (estimatedReturnTime instanceof Date && !isNaN(estimatedReturnTime.getTime())) {
+        if (estimatedReturnTime.getTime() <= OPC_UA_MIN_DATE_TIME_MS) {
+          // MinDateTime: server will not restart.
+          return null
+        }
+        const delayMs = estimatedReturnTime.getTime() - Date.now()
+        if (delayMs > 0) {
+          this.logger.info(
+            `EstimatedReturnTime: ${estimatedReturnTime.toISOString()} (reconnect in ${delayMs} ms).`,
+          )
+          return delayMs
+        }
+        // EstimatedReturnTime is already in the past — server should be back, retry quickly.
+        this.logger.info('EstimatedReturnTime is in the past; reconnecting immediately.')
+        return this.configuration.minReconnectDelayMs
+      }
+    } catch (err) {
+      this.logger.debug('Failed to read EstimatedReturnTime; using configured delay:', err)
+    }
+    return this.configuration.shutdownReconnectDelayMs
   }
 
   async connect(): Promise<void> {

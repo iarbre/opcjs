@@ -18,7 +18,7 @@
 | Done | Conformance Unit | Status | Notes |
 |------|-----------------|--------|-------|
 | ❌ | Base Info Client Currency | Not impl | No CurrencyUnit Property handling |
-| ❌ | Base Info Client Estimated Return Time | Not impl | Reconnect logic does not read the EstimatedReturnTime property |
+| ✅ | Base Info Client Estimated Return Time | Done | After shutdown detection, `Client.computeReconnectDelayMs()` reads `Server/ServerStatus/EstimatedReturnTime` (ns=0,i=2992). Future date → delay=ERT−now. Past date → reconnect in 1 s. MinDateTime → fires `onPermanentShutdown`, no reconnect. Errors → fall back to `shutdownReconnectDelayMs`. |
 | ❌ | Base Info Client Selection List | Not impl | No SelectionListType awareness |
 | ✅ | Base Services Client Diagnostics | Done | `returnDiagnostics` field on `RequestOptions`; callers pass it to `read()`, `callMethod()`, and `browse()`. Diagnostic info is returned in `ReadValueResult.diagnosticInfo` and `CallMethodResult.diagnosticInfo`. |
 | ❌ | Security Admin – Certificate Management | Not impl | No cert store / trust list management |
@@ -97,7 +97,7 @@
 - [x] **Detect Server Shutdown** — monitor `ServerStatus/State` and trigger a reconnect when a server shutdown is announced.
 - [x] **Session Impersonate** — add an explicit `impersonate(identity)` method that calls `ActivateSession` with a different identity token.
 - [x] **Renew NodeIds** — track the NamespaceTable after session establishment and detect/recalculate NodeId Namespace Indices when it changes.
-- [ ] **EstimatedReturnTime** — read `Server/ServerStatus/EstimatedReturnTime` during reconnect logic to schedule the next retry intelligently.
+- [x] **EstimatedReturnTime** — read `Server/ServerStatus/EstimatedReturnTime` during reconnect logic to schedule the next retry intelligently.
 - [ ] **CurrencyUnit Property** — handle `CurrencyUnitType` on DataVariables that represent currency values.
 - [ ] **SelectionListType** — recognise and expose `SelectionListType` variables to the application layer.
 - [x] **Security None with cert fallback** — if the server rejects CreateSession without a certificate, retry with an ApplicationInstanceCertificate.

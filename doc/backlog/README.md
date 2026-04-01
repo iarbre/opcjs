@@ -7,7 +7,7 @@ Each facet has its own folder; each conformance unit has its own document.
 
 | Folder | Facet | Required by | Required CUs | Optional CUs |
 |--------|-------|-------------|--------------|--------------|
-| [core-2022-client-facet/](./core-2022-client-facet/) | Core 2022 Client Facet | Minimum UA Client 2022 Profile | 7 / 7 ✅ | 2 ✅ · 1 ⚠️ · 6 ❌ |
+| [core-2022-client-facet/](./core-2022-client-facet/) | Core 2022 Client Facet | Minimum UA Client 2022 Profile | 7 / 7 ✅ | 6 ✅ · 3 ❌ |
 | [ua-tcp-ua-sc-ua-binary/](./ua-tcp-ua-sc-ua-binary/) | UA-TCP UA-SC UA-Binary | Core 2022 Client Facet (dependency) | 3 / 3 ✅ | — |
 | [security-policy-none/](./security-policy-none/) | SecurityPolicy – None | Core 2022 Client Facet (dependency) | 7 / 7 ✅ | 1 / 1 ✅ |
 | [security-time-synchronization/](./security-time-synchronization/) | Security Time Synchronization | Core 2022 Client Facet (dependency) | 1 / 1 ✅ | 1 ✅ · 5 ❌ |
@@ -32,14 +32,14 @@ Each facet has its own folder; each conformance unit has its own document.
 | Status | Conformance Unit |
 |--------|-----------------|
 | ❌ | [Base Info Client Currency](./core-2022-client-facet/base-info-client-currency.md) |
-| ❌ | [Base Info Client Estimated Return Time](./core-2022-client-facet/base-info-client-estimated-return-time.md) |
+| ✅ | [Base Info Client Estimated Return Time](./core-2022-client-facet/base-info-client-estimated-return-time.md) |
 | ❌ | [Base Info Client Selection List](./core-2022-client-facet/base-info-client-selection-list.md) |
 | ✅ | [Base Services Client Diagnostics](./core-2022-client-facet/base-services-client-diagnostics.md) |
 | ❌ | [Security Admin – Certificate Management](./core-2022-client-facet/security-admin-certificate-management.md) |
 | ✅ | [Session Client Cancel](./core-2022-client-facet/session-client-cancel.md) |
-| ❌ | [Session Client Detect Shutdown](./core-2022-client-facet/session-client-detect-shutdown.md) |
-| ⚠️ | [Session Client Impersonate](./core-2022-client-facet/session-client-impersonate.md) |
-| ❌ | [Session Client Renew NodeIds](./core-2022-client-facet/session-client-renew-nodeids.md) |
+| ✅ | [Session Client Detect Shutdown](./core-2022-client-facet/session-client-detect-shutdown.md) |
+| ✅ | [Session Client Impersonate](./core-2022-client-facet/session-client-impersonate.md) |
+| ✅ | [Session Client Renew NodeIds](./core-2022-client-facet/session-client-renew-nodeids.md) |
 
 #### UA-TCP UA-SC UA-Binary — Required
 
