@@ -16,9 +16,10 @@ export class MethodService extends ServiceBase {
     async call(
         methodsToCall: CallMethodRequest[],
         returnDiagnostics = 0,
+        requestHandle?: number,
     ): Promise<{ statusCode: number, value: unknown[], diagnosticInfo?: DiagnosticInfo }[]> {
         const request = new CallRequest();
-        request.requestHeader = this.createRequestHeader(returnDiagnostics);
+        request.requestHeader = this.createRequestHeader(returnDiagnostics, requestHandle);
         request.methodsToCall = methodsToCall;
 
         this.logger.debug("Sending CallRequest...");

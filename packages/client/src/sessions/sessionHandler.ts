@@ -87,6 +87,18 @@ export class SessionHandler {
     }
 
     /**
+     * Sends a CancelRequest to the server to abandon a pending service call
+     * (OPC UA Part 4, Section 5.7.5).
+     *
+     * @param requestHandle - The `requestHandle` from the `RequestHeader` of the
+     *   pending request to cancel.
+     * @returns The number of requests the server actually cancelled.
+     */
+    async cancel(requestHandle: number): Promise<number> {
+        return this.sessionServices.cancel(requestHandle)
+    }
+
+    /**
      * Validates the requested user-identity token type against:
      *   1. The `allowedUserTokenTypes` from the client security configuration — the
      *      client has explicitly restricted which token types it will use.

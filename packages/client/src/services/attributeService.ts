@@ -23,6 +23,7 @@ export class AttributeService extends ServiceBase {
         maxAge: number = 0,
         timestampsToReturn: TimestampsToReturnEnum = TimestampsToReturnEnum.Source,
         returnDiagnostics = 0,
+        requestHandle?: number,
     ): Promise<{ statusCode: number, value: unknown, diagnosticInfo?: DiagnosticInfo }[]> {
         const readValueIds = nodeIds.map(ni => {
             const readValueId = new ReadValueId();
@@ -34,7 +35,7 @@ export class AttributeService extends ServiceBase {
         });
 
         const request = new ReadRequest();
-        request.requestHeader = this.createRequestHeader(returnDiagnostics);
+        request.requestHeader = this.createRequestHeader(returnDiagnostics, requestHandle);
         request.maxAge = maxAge;
         request.timestampsToReturn = timestampsToReturn;
         request.nodesToRead = readValueIds;

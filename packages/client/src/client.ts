@@ -44,6 +44,7 @@ import { BrowseService } from './services/browseService.js'
 import { BrowseNodeResult } from './browseNodeResult.js'
 import { CallMethodArgument } from './method/callMethodArgument.js'
 import type { RequestOptions } from './requestOptions.js'
+import { lastAssignedHandle, nextRequestHandle } from './services/serviceBase.js'
 
 /** NodeId of Server_ServerStatus (ns=0, i=2256) — a cheap server-side read used for session keep-alive. */
 const SERVER_STATUS_NODE_ID = NodeId.newNumeric(0, 2256)
@@ -354,48 +355,88 @@ export class Client {
     this.logger.info('Disconnected.')
   }
 
-  async read(ids: NodeId[], options?: RequestOptions): Promise<ReadValueResult[]> {
-    return this.withSessionRefresh(async () => {
-      const result = await this.attributeService?.ReadValue(ids, 0, undefined, options?.returnDiagnostics)
+  /**
+   * Reads the Value attribute of one or more Nodes.
+   *
+   * The returned object is a `Promise` that also exposes `requestHandle` — the
+   * OPC UA `requestHandle` assigned to the underlying `ReadRequest`.  The handle
+   * is available synchronously (before `await`) so it can be passed to
+   * `cancel()` to abort the in-flight request.
+   *
+   * @example
+   * ```ts
+   * const req = client.read([nodeId])
+   * await client.cancel(req.requestHandle) // abort before response
+   * const results = await req              // ReadValueResult[]
+   * ```
+   */
+  read(ids: NodeId[], options?: RequestOptions): Promise<ReadValueResult[]> & { requestHandle: number } {
+    const requestHandle = nextRequestHandle()
+    const promise = this.withSessionRefresh(async () => {
+      const result = await this.attributeService?.ReadValue(ids, 0, undefined, options?.returnDiagnostics, requestHandle)
       return result?.map(r => new ReadValueResult(r.value, r.statusCode, r.diagnosticInfo)) ?? []
     })
+    return Object.assign(promise, { requestHandle })
   }
 
   /**
    * Method for calling a single method on the server.
+   *
+   * The returned object is a `Promise` that also exposes `requestHandle` — the
+   * OPC UA `requestHandle` assigned to the underlying `CallRequest`. The handle
+   * is available synchronously (before `await`) so it can be passed to
+   * `cancel()` to abort the in-flight request.
+   *
    * @param objectId - NodeId of the Object that owns the method.
    * @param methodId - NodeId of the Method to invoke.
    * @param inputArguments - Input argument Variants (default: empty).
    * @param options - Request options (e.g. `returnDiagnostics`).
-   * @returns The CallMethodResult for the invoked method.
+   * @returns A promise resolving to the CallMethodResult, with `requestHandle` available synchronously.
    */
-  async callMethod(
+  callMethod(
     objectId: NodeId,
     methodId: NodeId,
     inputArguments: CallMethodArgument[] = [],
     options?: RequestOptions,
-  ): Promise<CallMethodResult> {
-    return this.withSessionRefresh(async () => {
+  ): Promise<CallMethodResult> & { requestHandle: number } {
+    const requestHandle = nextRequestHandle()
+    const promise = this.withSessionRefresh(async () => {
       const request = new CallMethodRequest()
       request.objectId = objectId
       request.methodId = methodId
       request.inputArguments = inputArguments.map(arg => Variant.newFrom(arg as Parameters<typeof Variant.newFrom>[0]))
 
-      const responses = await this.methodService!.call([request], options?.returnDiagnostics)
+      const responses = await this.methodService!.call([request], options?.returnDiagnostics, requestHandle)
       const response = responses[0]
       return new CallMethodResult(response.value, response.statusCode, response.diagnosticInfo)
     })
+    return Object.assign(promise, { requestHandle })
   }
 
-  async browse(
+  /**
+   * Browses the Address Space starting from `nodeId`.
+   *
+   * The returned object is a `Promise` that also exposes `requestHandle` — the
+   * OPC UA `requestHandle` assigned to the initial `BrowseRequest`. The handle
+   * is available synchronously (before `await`) so it can be passed to
+   * `cancel()` to abort the in-flight request.
+   *
+   * @param nodeId - Starting node.
+   * @param recursive - When true, recursively follows HierarchicalReferences.
+   * @param options - Request options (e.g. `returnDiagnostics`).
+   * @returns A promise resolving to the list of referenced nodes, with `requestHandle` available synchronously.
+   */
+  browse(
     nodeId: NodeId,
     recursive: boolean = false,
     options?: RequestOptions,
-  ): Promise<BrowseNodeResult[]> {
-    return this.withSessionRefresh(() => {
+  ): Promise<BrowseNodeResult[]> & { requestHandle: number } {
+    const requestHandle = nextRequestHandle()
+    const promise = this.withSessionRefresh(() => {
       const visited = new Set<string>()
-      return this.browseRecursive(nodeId, recursive, visited, options?.returnDiagnostics ?? 0)
+      return this.browseRecursive(nodeId, recursive, visited, options?.returnDiagnostics ?? 0, requestHandle)
     })
+    return Object.assign(promise, { requestHandle })
   }
 
   private async browseRecursive(
@@ -403,6 +444,7 @@ export class Client {
     recursive: boolean,
     visited: Set<string>,
     returnDiagnostics: number,
+    requestHandle?: number,
   ): Promise<BrowseNodeResult[]> {
     const nodeKey = `${nodeId.namespace}:${nodeId.identifier}`;
     if (visited.has(nodeKey)) {
@@ -418,7 +460,7 @@ export class Client {
     description.nodeClassMask = 0; // all node classes
     description.resultMask = BrowseResultMaskEnum.All;
 
-    const browseResults = await this.browseService!.browse([description], returnDiagnostics);
+    const browseResults = await this.browseService!.browse([description], returnDiagnostics, requestHandle);
     const browseResult = browseResults[0];
     const allReferences = [...(browseResult.references ?? [])];
 
@@ -465,6 +507,56 @@ export class Client {
     options?: SubscriptionOptions
   ) {
     this.subscriptionHandler?.subscribe(ids, callback, options);
+  }
+
+  /**
+   * Asks the server to cancel a pending service request
+   * (OPC UA Part 4, Section 5.7.5 — Session Client Cancel conformance unit).
+   *
+   * The `requestHandle` uniquely identifies the pending request. It is the value
+   * assigned to `RequestHeader.requestHandle` when the request was initially sent.
+   * Service calls made through this client automatically assign monotonically
+   * increasing handles, so the caller can capture the handle before or after issuing
+   * Each method (`read`, `browse`, `callMethod`) returns a `Promise` with a
+   * `requestHandle` property that is available synchronously.  Pass that handle
+   * here to abort the corresponding in-flight request.
+   *
+   * The server makes a best-effort attempt to cancel the matching request. Cancelled
+   * requests complete with status `BadRequestCancelledByClient`. Not all servers
+   * guarantee that a request in flight can be cancelled.
+   *
+   * @param requestHandle - Handle of the pending request to cancel.
+   * @returns The number of pending requests the server actually cancelled.
+   * @throws If no session is active or the server returns a non-Good status.
+   *
+   * @example
+   * ```ts
+   * // Issue a potentially slow operation and immediately cancel it.
+   * const req = client.read([nodeId])
+   * const cancelled = await client.cancel(req.requestHandle)
+   * console.log(`Cancelled ${cancelled} request(s)`)
+   * const results = await req  // resolves with BadRequestCancelledByClient
+   * ```
+   */
+  async cancel(requestHandle: number): Promise<number> {
+    if (!this.sessionHandler) {
+      throw new Error('Not connected: call connect() before cancel()')
+    }
+    return this.sessionHandler.cancel(requestHandle)
+  }
+
+  /**
+   * The `requestHandle` value that was assigned to the most recently issued
+   * service request in this session.
+   *
+   * @deprecated Prefer accessing `requestHandle` directly on the promise returned
+   *   by `read()`, `browse()`, or `callMethod()`, which is available synchronously
+   *   before `await` and avoids relying on shared module state.
+   *
+   * Returns `0` before any request has been sent.
+   */
+  get lastRequestHandle(): number {
+    return lastAssignedHandle()
   }
 
   constructor(

@@ -1,5 +1,6 @@
 import {
     ActivateSessionRequest, ActivateSessionResponse, ApplicationDescription, ApplicationTypeEnum,
+    CancelRequest, CancelResponse,
     CloseSessionRequest, CloseSessionResponse,
     Configuration, CreateSessionRequest, CreateSessionResponse, EndpointDescription, ExtensionObject,
     getLogger,
@@ -144,6 +145,38 @@ export class SessionService extends ServiceBase {
         }
 
         this.logger.debug("Session activated.");
+    }
+
+    /**
+     * Sends a CancelRequest to the server asking it to abandon the pending
+     * service request identified by `requestHandle` (OPC UA Part 4, Section 5.7.5).
+     *
+     * The server makes a best-effort attempt to cancel matching requests.
+     * Cancelled requests complete with a status of `BadRequestCancelledByClient`.
+     *
+     * @param requestHandle - The `requestHeader.requestHandle` value of the pending
+     *   request to cancel. Pass `0` to attempt to cancel all outstanding requests
+     *   (server behaviour for handle 0 is implementation-specific).
+     * @returns The number of pending requests that were actually cancelled
+     *   (`CancelResponse.cancelCount`).
+     */
+    async cancel(requestHandle: number): Promise<number> {
+        this.logger.debug(`Sending CancelRequest for requestHandle ${requestHandle}...`);
+
+        const request = new CancelRequest();
+        request.requestHeader = this.createRequestHeader();
+        request.requestHandle = requestHandle;
+
+        const response = await this.secureChannel.issueServiceRequest(request) as CancelResponse;
+
+        const result = response?.responseHeader?.serviceResult;
+        if (result !== undefined && result !== StatusCode.Good) {
+            throw new Error(`CancelRequest failed: ${StatusCodeToString(result)}`);
+        }
+
+        const cancelCount = response?.cancelCount ?? 0;
+        this.logger.debug(`CancelRequest completed; cancelCount = ${cancelCount}.`);
+        return cancelCount;
     }
 
     /**

@@ -16,14 +16,14 @@ export class BrowseService extends ServiceBase {
    * @param returnDiagnostics - Bitmask of diagnostic fields to request (OPC UA Part 4, §7.15). Default: 0.
    * @returns Array of BrowseResult, one per requested node.
    */
-  async browse(nodesToBrowse: BrowseDescription[], returnDiagnostics = 0): Promise<BrowseResult[]> {
+  async browse(nodesToBrowse: BrowseDescription[], returnDiagnostics = 0, requestHandle?: number): Promise<BrowseResult[]> {
     const view = new ViewDescription();
     view.viewId = NodeId.newNumeric(0, 0);
     view.timestamp = new Date(-11644473600000); // OPC UA MinDateTime (ticks=0)
     view.viewVersion = 0;
 
     const request = new BrowseRequest();
-    request.requestHeader = this.createRequestHeader(returnDiagnostics);
+    request.requestHeader = this.createRequestHeader(returnDiagnostics, requestHandle);
     request.view = view;
     request.requestedMaxReferencesPerNode = 0;
     request.nodesToBrowse = nodesToBrowse;

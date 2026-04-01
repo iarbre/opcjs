@@ -19,6 +19,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   EndpointDescription,
+  type IOpcType,
   NodeId,
   StatusCode,
   UserTokenPolicy,
@@ -40,7 +41,7 @@ function makeChannel() {
     getSecurityPolicy: () => SECURITY_POLICY_NONE_URI,
     getSecurityMode: () => 0,
     getEndpointUrl: () => 'opc.wss://test',
-    issueServiceRequest: () => Promise.reject(new Error('not used')),
+    issueServiceRequest: () => Promise.reject(new Error('not used')) as Promise<IOpcType>,
   }
 }
 
