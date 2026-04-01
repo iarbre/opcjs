@@ -2,7 +2,7 @@
 
 **Facet**: Core 2022 Client Facet  
 **Type**: Optional  
-**Status**: ❌ Not implemented  
+**Status**: ✅ Implemented  
 
 ## Description
 
@@ -32,16 +32,22 @@ A client claiming this CU must:
 Online: https://reference.opcfoundation.org/Core/Part5/v105/docs/  
 Online: https://reference.opcfoundation.org/NodeSets/ (namespace index 0, `CurrencyUnitType`)
 
-## Implementation Gap
+## Implementation
 
-No implementation. The client currently has no special-casing for `CurrencyUnitType` DataVariables; they would be returned as raw `ExtensionObject` values.
+`CurrencyUnitType` is fully implemented in `opcjs-base`:
 
-## Work Required
+| Item | Location | Details |
+|------|----------|---------|
+| Class definition | `packages/base/src/schema/types.ts` | `CurrencyUnitType` with all four ISO 4217 fields |
+| Binary decoder | `packages/base/src/schema/decoders.ts` | `decodeCurrencyUnitType` |
+| Binary encoder | `packages/base/src/schema/encoders.ts` | `encodeCurrencyUnitType` |
+| Type decoder registration | `packages/base/src/schema/decoderRegistrations.ts` | `registerTypeDecoders`: typeId `23498` |
+| Encoding-ID registration | `packages/base/src/schema/decoderRegistrations.ts` | `registerBinaryDecoders`: encodingId `23507` → typeId `23498` |
+| Encoder registration | `packages/base/src/schema/encoderRegistrations.ts` | `registerEncoders`: typeId `23498` |
+| Public export | `packages/base/src/index.ts` | via `export * from './schema/types.js'` |
+| Unit tests | `packages/base/tests/types/currencyUnitType.test.ts` | 22 tests covering node IDs, round-trips (EUR/USD/JPY), edge cases, and known-byte decode |
 
-1. Generate or hand-write a TypeScript codec for `CurrencyUnitType`.
-2. Register the codec in the DataType codec registry so that `attributeService.read()` returns a typed object.
-3. Export the `CurrencyUnitType` interface from the public API.
-4. Add unit tests for encode/decode round-trip.
+`ConfigurationClient.getSimple()` calls both `registerTypeDecoders` and `registerBinaryDecoders`, so any `ExtensionObject` whose binary-encoding NodeId equals `i=23507` is automatically decoded to a `CurrencyUnitType` instance by `AttributeService.ReadValue()`.
 
 ## Related Conformance Units
 

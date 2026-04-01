@@ -25,8 +25,9 @@
   "scripts": {
     "lint": "eslint ./src",
     "verify": "npx tsc --noEmit",
+    "verify:test": "npx tsc -p tsconfig.test.json --noEmit",
     "build": "tsup",
-    "prepublish": "npm run lint && npm run verify && npm run build && npm run test",
+    "prepublish": "npm run lint && npm run verify && npm run verify:test && npm run build && npm run test",
     "dev": "tsup --watch",
     "test": "vitest run",
     "generate": "node ../generator/dist/cli.js ../../../ext/UA-NodeSet/Schema/Opc.Ua.NodeSet2.Services.xml -o src/schema"

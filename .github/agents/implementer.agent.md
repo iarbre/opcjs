@@ -79,10 +79,10 @@ Before finishing any edit to a `.ts` file in `packages/client/src/`:
 
 Run all steps **in order**. If a step fails, report the failure and continue so all problems are surfaced at once.
 
-### 3.1 Base package — tests and prepublish
+### 3.1 Base package — tests with prepublish
 
 ```bash
-cd packages/base && npm test && npm run prepublish
+cd packages/base && npm run prepublish
 ```
 
 ### 3.2 Client package — tests
@@ -99,7 +99,8 @@ cd packages/client && npm run prepublish
 
 ### 3.4 Update the conformance backlog
 
-- Open `doc/backlog/README.md` and the relevant facet documents.
+- Open `doc/backlog/README.md`, the readme in the facets folder and the relevant facet documents.
+- Update the readme in the package root (e.g. `packages/client/readme.md`) if it contains a conformance status summary.
 - Change any conformance unit affected by this feature from ❌ to ✅ (or ⚠️ if partially implemented).
 - Update the summary counts in the facet table header row.
 - If a new conformance unit is introduced, add the corresponding `.md` file and table row.

@@ -39,7 +39,7 @@ async function main(): Promise<void> {
     const id = NodeId.newString(2, 'Scalar_Simulation_Double');
     const results = await client.read([id])
     for (let r of results) {
-      console.log(r.status, r.value)
+      console.log(r.statusCode, r.value)
     }
 
     // client.subscribe([Id.newId(2, 'Scalar_Simulation_Double')], (datas) => {

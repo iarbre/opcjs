@@ -235,6 +235,7 @@ No application-level time-sync mechanism (IEEE 1588 PTP, IEEE 802.1AS, UA-based 
 | Conformance Unit | Status |
 |-----------------|--------|
 | Address Space Client NodeId IdTypes | ✅ Done |
+| Base Info Client Currency | ✅ Done (see below) |
 | Documentation – Core Capacities | ✅ Done (see above) |
 | Base Services Client Diagnostics | ✅ Done (`RequestOptions.returnDiagnostics`, `ReturnDiagnosticsMask`) |
 | Security Administration | ✅ Done (`SecurityConfiguration`) |
@@ -248,6 +249,33 @@ No application-level time-sync mechanism (IEEE 1588 PTP, IEEE 802.1AS, UA-based 
 | SecurityPolicy None | ✅ Done |
 | Time Sync – Support (via OS) | ✅ Satisfied |
 | Security User Anonymous Client | ✅ Done |
+
+## Currency Values — `CurrencyUnitType`
+
+DataVariables whose DataType is `CurrencyUnitType` (`ns=0; i=23498`, OPC UA Part 5 §12) are
+automatically decoded to a typed object instead of a raw `ExtensionObject`.
+
+```ts
+import { CurrencyUnitType } from 'opcjs-base'
+import { NodeId } from 'opcjs-base'
+
+const [result] = await client.read([NodeId.newNumeric(0, /* currency node */ 1234)])
+if (result.value instanceof CurrencyUnitType) {
+  console.log(result.value.alphabeticCode) // e.g. "EUR"
+  console.log(result.value.numericCode)    // e.g. 978
+  console.log(result.value.exponent)       // e.g. -2  (cent-denominated)
+  console.log(result.value.currency.text)  // e.g. "Euro"
+}
+```
+
+The fields follow ISO 4217:
+
+| Field | OPC UA type | Description |
+|-------|-------------|-------------|
+| `numericCode` | `Int16` | ISO 4217 numeric code (e.g. `978` = EUR) |
+| `exponent` | `SByte` | Decimal-place shift (e.g. `−2` for cent currencies, `0` for JPY) |
+| `alphabeticCode` | `String` | Three-letter ISO 4217 code (e.g. `"EUR"`) |
+| `currency` | `LocalizedText` | Human-readable currency name |
 
 ## License
 
