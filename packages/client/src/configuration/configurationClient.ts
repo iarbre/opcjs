@@ -22,6 +22,16 @@ export class ConfigurationClient extends Configuration {
    * @see SecurityConfiguration
    */
   public securityConfiguration?: SecurityConfiguration
+
+  /**
+   * How long to wait (ms) before attempting a reconnect after a server-shutdown
+   * is detected via `ServerStatus/State = Shutdown` or a subscription
+   * `StatusChangeNotification` with `BadShutdown` / `BadServerHalted`.
+   *
+   * Gives the server process time to exit fully before the client tries to
+   * re-connect.  Defaults to 5 000 ms.
+   */
+  public shutdownReconnectDelayMs = 5_000
   public static getSimple(
     name: string,
     company: string,

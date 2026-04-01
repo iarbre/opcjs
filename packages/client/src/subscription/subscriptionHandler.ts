@@ -4,6 +4,7 @@ import {
     getLogger,
     NodeId,
     StatusChangeNotification,
+    StatusCode,
     SubscriptionAcknowledgement,
 } from 'opcjs-base'
 
@@ -25,6 +26,16 @@ export class SubscriptionHandler {
     private isRunning = false
     /** Guards against multiple concurrent publish loops. */
     private publishInFlight = false
+
+    /**
+     * Optional callback invoked when the server announces a shutdown via a
+     * `StatusChangeNotification` with status `BadShutdown` or `BadServerHalted`
+     * (OPC UA Part 4, §5.13.6.2 — Session Client Detect Shutdown).
+     *
+     * Assign this before calling `subscribe()`.  The client sets it automatically
+     * in `initServices()` to trigger a reconnect.
+     */
+    onShutdown?: () => void
 
     /** Returns true when at least one subscription is active and the publish loop is running. */
     hasActiveSubscription(): boolean {
@@ -109,12 +120,22 @@ export class SubscriptionHandler {
                     entry?.callback([{ id: entry.id, value: item.value.value?.value }])
                 }
             } else if (typeNodeId.namespace === 0 && typeNodeId.identifier === NODE_ID_STATUS_CHANGE_NOTIFICATION) {
-                // The server notifies us the subscription state has changed (e.g. expired, closed).
+                // The server notifies us the subscription state has changed (e.g. expired, closed, shutdown).
                 const statusChange = decodedData as StatusChangeNotification
                 this.logger.warn(
                     `Subscription ${subscriptionId} status changed: 0x${statusChange.status?.toString(16).toUpperCase()}`,
                 )
                 this.isRunning = false
+                // OPC UA Part 4, §5.13.6.2: BadShutdown / BadServerHalted indicates the server is
+                // shutting down.  Notify the client so it can schedule a reconnect.
+                const status = statusChange.status
+                if (
+                    status === StatusCode.BadShutdown ||
+                    status === StatusCode.BadServerHalted
+                ) {
+                    this.logger.warn('Server shutdown announced via StatusChangeNotification — triggering reconnect.')
+                    this.onShutdown?.()
+                }
                 return
             } else {
                 this.logger.warn(

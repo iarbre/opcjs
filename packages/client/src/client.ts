@@ -24,6 +24,8 @@ import {
   BrowseResultMaskEnum,
   ReferenceDescription,
   ILogger,
+  ServerStateEnum,
+  type ServerStatusDataType,
 } from 'opcjs-base'
 
 import { SessionHandler } from './sessions/sessionHandler.js'
@@ -54,6 +56,7 @@ const SERVER_STATUS_NODE_ID = NodeId.newNumeric(0, 2256)
  */
 const KEEP_ALIVE_INTERVAL_MS = 25_000
 
+
 export class Client {
   private endpointUrl: string
   private attributeService?: AttributeService
@@ -68,6 +71,8 @@ export class Client {
   private ws?: WebSocketFascade
   private sessionHandler?: SessionHandler
   private keepAliveTimer?: ReturnType<typeof setInterval>
+  /** Set to true while a shutdown-triggered reconnect is pending to avoid duplicate attempts. */
+  private shutdownReconnectPending = false
 
   getSession(): Session {
     if (!this.session) {
@@ -90,6 +95,8 @@ export class Client {
       new SubscriptionService(authToken, sc),
       new MonitoredItemService(authToken, sc),
     )
+    // Wire the subscription-level shutdown notification into the same reconnect path.
+    this.subscriptionHandler.onShutdown = () => this.handleServerShutdownDetected()
   }
 
   /**
@@ -142,6 +149,11 @@ export class Client {
    * Starts a periodic keep-alive timer that reads Server_ServerStatus when no subscription is
    * active. OPC UA Part 4, Section 5.7.1 requires clients to keep the session alive; when no
    * subscription Publish loop is running this is the only mechanism that does so.
+   *
+   * The keep-alive read also serves as the **Detect Shutdown** mechanism (Session Client Detect
+   * Shutdown conformance unit): when the returned `ServerStatusDataType.state` equals
+   * `ServerStateEnum.Shutdown` the client schedules a reconnect after
+   * `SHUTDOWN_RECONNECT_DELAY_MS` to let the server finish its shutdown sequence.
    */
   private startKeepAlive(): void {
     this.keepAliveTimer = setInterval(() => {
@@ -150,7 +162,12 @@ export class Client {
         return
       }
       if (this.attributeService) {
-        void this.attributeService.ReadValue([SERVER_STATUS_NODE_ID]).catch((err) => {
+        void this.attributeService.ReadValue([SERVER_STATUS_NODE_ID]).then((results) => {
+          const statusData = results[0]?.value as ServerStatusDataType | undefined
+          if (statusData?.state === ServerStateEnum.Shutdown) {
+            this.handleServerShutdownDetected()
+          }
+        }).catch((err) => {
           this.logger.warn('Keep-alive read failed:', err)
         })
       }
@@ -160,6 +177,41 @@ export class Client {
   private stopKeepAlive(): void {
     clearInterval(this.keepAliveTimer)
     this.keepAliveTimer = undefined
+  }
+
+  /**
+   * Called when a server-shutdown announcement is detected — either via the keep-alive read
+   * returning `ServerStateEnum.Shutdown` or via a subscription `StatusChangeNotification`
+   * with status `BadShutdown` / `BadServerHalted`.
+   *
+   * Stops the keep-alive timer, waits for `SHUTDOWN_RECONNECT_DELAY_MS` to allow the server
+   * process to exit, then invokes `reconnectAndReactivate()`.  Only one reconnect attempt is
+   * scheduled at a time; a second detection while one is already pending is silently ignored.
+   */
+  private handleServerShutdownDetected(): void {
+    if (this.shutdownReconnectPending) {
+      return
+    }
+    this.shutdownReconnectPending = true
+    const delay = this.configuration.shutdownReconnectDelayMs
+    this.logger.warn(
+      `Server shutdown detected. Scheduling reconnect in ${delay} ms...`,
+    )
+    this.stopKeepAlive()
+    setTimeout(() => {
+      void this.reconnectAndReactivate()
+        .then(() => {
+          this.initServices()
+          this.startKeepAlive()
+          this.logger.info('Reconnected after server shutdown.')
+        })
+        .catch((err) => {
+          this.logger.warn('Reconnect after server shutdown failed:', err)
+        })
+        .finally(() => {
+          this.shutdownReconnectPending = false
+        })
+    }, delay)
   }
 
   async connect(): Promise<void> {
