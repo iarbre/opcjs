@@ -106,7 +106,8 @@ describe('SessionService.cancel()', () => {
     expect(result).toBe(3)
     expect(spy).toHaveBeenCalledTimes(1)
     // Verify the sent request carries the correct requestHandle.
-    const sentRequest = spy.mock.calls[0][0] as { requestHandle: number }
+    const calls = spy.mock.calls as unknown as [unknown[]]
+    const sentRequest = calls[0][0] as { requestHandle: number }
     expect(sentRequest.requestHandle).toBe(42)
   })
 
