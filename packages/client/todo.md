@@ -23,7 +23,7 @@
 | ✅ | Base Services Client Diagnostics | Done | `returnDiagnostics` field on `RequestOptions`; callers pass it to `read()`, `callMethod()`, and `browse()`. Diagnostic info is returned in `ReadValueResult.diagnosticInfo` and `CallMethodResult.diagnosticInfo`. |
 | ❌ | Security Admin – Certificate Management | Not impl | No cert store / trust list management |
 | ❌ | Session Client Cancel | Not impl | CancelRequest type exists in schema but there is no client-level API |
-| ❌ | Session Client Detect Shutdown | Not impl | No ServerStatus/State monitoring |
+| ✅ | Session Client Detect Shutdown | Done | `startKeepAlive()` checks `ServerStatusDataType.state === ServerStateEnum.Shutdown`; subscription `StatusChangeNotification` with `BadShutdown`/`BadServerHalted` triggers `handleServerShutdownDetected()` which debounces and calls `reconnectAndReactivate()` after a 5 s delay. |
 | ⚠️ | Session Client Impersonate | Partial | ActivateSession can switch identity but there is no explicit impersonation workflow |
 | ❌ | Session Client Renew NodeIds | Not impl | No namespace table change detection |
 
@@ -93,8 +93,8 @@
 ### P2 — Optional conformance units (nice to have)
 
 - [x] **Service diagnostics** — expose `returnDiagnostics` in the request options so callers can request diagnostic info.
-- [ ] **Session Cancel** — expose `CancelRequest` as a client API.
-- [ ] **Detect Server Shutdown** — monitor `ServerStatus/State` and trigger a reconnect when a server shutdown is announced.
+- [x] **Session Cancel** — expose `CancelRequest` as a client API.
+- [x] **Detect Server Shutdown** — monitor `ServerStatus/State` and trigger a reconnect when a server shutdown is announced.
 - [ ] **Session Impersonate** — add an explicit `impersonate(identity)` method that calls `ActivateSession` with a different identity token.
 - [ ] **Renew NodeIds** — track the NamespaceTable after session establishment and detect/recalculate NodeId Namespace Indices when it changes.
 - [ ] **EstimatedReturnTime** — read `Server/ServerStatus/EstimatedReturnTime` during reconnect logic to schedule the next retry intelligently.
