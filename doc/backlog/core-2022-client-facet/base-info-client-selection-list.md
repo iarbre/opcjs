@@ -2,7 +2,7 @@
 
 **Facet**: Core 2022 Client Facet  
 **Type**: Optional  
-**Status**: ❌ Not implemented  
+**Status**: ✅ Implemented  
 
 ## Description
 
@@ -19,12 +19,28 @@ A client claiming this conformance unit must recognise and use the `SelectionLis
 
 NodeId of `SelectionListType`: `ns=0; i=19726`
 
-### Client behaviour
+### Implemented client behaviour
 
-When browsing or reading a Variable whose `TypeDefinition` reference points to `SelectionListType` (or a subtype), the client should:
-1. Read the `Selections` and `SelectionDescriptions` Properties.
-2. If `RestrictToList = true`, enforce that write operations only send values present in `Selections`.
-3. Present the `SelectionDescriptions` labels to the user in place of raw values where appropriate.
+The client now exposes `SelectionListType` metadata directly to the application layer via:
+
+- `Client.getSelectionList(nodeId): Promise<SelectionList | null>`
+
+Implementation details:
+
+1. Browses forward `HasProperty` (`ns=0;i=46`) references from `nodeId`.
+2. Locates `Selections` (mandatory), `SelectionDescriptions` (optional), and `RestrictToList` (optional) by `BrowseName`.
+3. Reads all discovered property values in one batch `Read` request.
+4. Returns a typed `SelectionList` object:
+   - `selections: unknown[]`
+   - `selectionDescriptions: LocalizedText[]`
+   - `restrictToList: boolean`
+   - `nodeId: NodeId`
+5. Returns `null` when `Selections` is not present on the node.
+
+Current scope:
+
+- Metadata discovery and exposure are implemented.
+- Write-time enforcement for `RestrictToList=true` is not yet implemented.
 
 ## Specification References
 
@@ -37,19 +53,14 @@ When browsing or reading a Variable whose `TypeDefinition` reference points to `
 Online: https://reference.opcfoundation.org/Core/Part5/v105/docs/  
 Online: https://reference.opcfoundation.org/NodeSets/ (namespace 0, `SelectionListType`)
 
-## Implementation Gap
+## Verification
 
-The client has no mechanism to detect `SelectionListType` on a VariableType reference, nor any API to retrieve the `Selections` / `SelectionDescriptions` properties automatically.
-
-## Work Required
-
-1. Add a helper method (e.g. `client.getSelectionList(nodeId)`) that:
-   - Reads `TypeDefinition` via `Browse`.
-   - If type is `SelectionListType` or a subtype, reads `Selections`, `SelectionDescriptions`, and `RestrictToList` properties.
-   - Returns a typed `SelectionList` result object.
-2. Optionally integrate list-enforcement into `attributeService.write()`.
-3. Export the `SelectionList` interface.
-4. Add unit and integration tests.
+- API and type:
+   - `packages/client/src/client.ts` (`getSelectionList`)
+   - `packages/client/src/selectionList.ts` (`SelectionList` type)
+   - `packages/client/src/index.ts` export
+- Unit tests:
+   - `packages/client/tests/unit/selectionList.test.ts`
 
 ## Related Conformance Units
 

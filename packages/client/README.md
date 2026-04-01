@@ -61,6 +61,26 @@ const [result] = await client.read([NodeId.newNumeric(0, 2258)])
 // result.diagnosticInfo — populated when returnDiagnostics > 0
 ```
 
+### `client.getSelectionList(nodeId): Promise<SelectionList | null>`
+
+Reads `SelectionListType` metadata (OPC UA Part 5 §7.18) from a variable and exposes it to application code.
+
+The method reads the variable's `HasProperty` references for:
+- `Selections` (mandatory)
+- `SelectionDescriptions` (optional)
+- `RestrictToList` (optional)
+
+It returns `null` when the variable does not expose a `Selections` property.
+
+```ts
+const list = await client.getSelectionList(nodeId)
+if (list) {
+  console.log(list.selections)
+  console.log(list.selectionDescriptions.map(d => d.text))
+  console.log('restrictToList:', list.restrictToList)
+}
+```
+
 ### `client.browse(nodeId, recursive?, options?): Promise<BrowseNodeResult[]>`
 
 Browses the `HierarchicalReferences` of a node. Set `recursive` to `true` to traverse the full sub-tree.
@@ -236,6 +256,7 @@ No application-level time-sync mechanism (IEEE 1588 PTP, IEEE 802.1AS, UA-based 
 |-----------------|--------|
 | Address Space Client NodeId IdTypes | ✅ Done |
 | Base Info Client Currency | ✅ Done (see below) |
+| Base Info Client Selection List | ✅ Done (`client.getSelectionList`) |
 | Documentation – Core Capacities | ✅ Done (see above) |
 | Base Services Client Diagnostics | ✅ Done (`RequestOptions.returnDiagnostics`, `ReturnDiagnosticsMask`) |
 | Security Administration | ✅ Done (`SecurityConfiguration`) |

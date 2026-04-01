@@ -137,3 +137,6 @@ Before handing back to the user, confirm each item:
 - [ ] Backlog updated
 - [ ] README updated
 - [ ] All three samples compile without errors
+
+## Summary
+Give a concise summary of the implementation that can be used as commit message or PR description, including any breaking changes.

@@ -23,6 +23,7 @@ import {
   BrowseDirectionEnum,
   BrowseResultMaskEnum,
   ReferenceDescription,
+  LocalizedText,
   ILogger,
   ServerStateEnum,
   type ServerStatusDataType,
@@ -48,6 +49,7 @@ import { CallMethodArgument } from './method/callMethodArgument.js'
 import type { RequestOptions } from './requestOptions.js'
 import { lastAssignedHandle, nextRequestHandle } from './services/serviceBase.js'
 import { NamespaceTable } from './namespaceTable.js'
+import type { SelectionList } from './selectionList.js'
 
 /** NodeId of Server_ServerStatus (ns=0, i=2256) — a cheap server-side read used for session keep-alive. */
 const SERVER_STATUS_NODE_ID = NodeId.newNumeric(0, 2256)
@@ -55,6 +57,8 @@ const SERVER_STATUS_NODE_ID = NodeId.newNumeric(0, 2256)
 const NAMESPACE_ARRAY_NODE_ID = NodeId.newNumeric(0, 2255)
 /** NodeId of Server/ServerStatus/EstimatedReturnTime (ns=0, i=2992). */
 const ESTIMATED_RETURN_TIME_NODE_ID = NodeId.newNumeric(0, 2992)
+/** OPC UA HasProperty reference type (ns=0, i=46). Used to find property nodes. */
+const HAS_PROPERTY_REF_TYPE_ID = NodeId.newNumeric(0, 46)
 /**
  * How often to read the server when no subscription is active (ms).
  * Must be shorter than the server's revisedSessionTimeout (default: 60 000 ms).
@@ -769,6 +773,114 @@ export class Client {
     await this.session.impersonate(identity)
     // Store the new identity so that reconnect / session refresh uses it.
     this.identity = identity
+  }
+
+  /**
+   * Reads the `SelectionListType` metadata for a Variable
+   * (OPC UA Part 5, §7.18 — Base Info Client Selection List conformance unit).
+   *
+   * The client browses the node's `HasProperty` references for `Selections`,
+   * `SelectionDescriptions`, and `RestrictToList`, then reads their values in a
+   * single batch Read request.
+   *
+   * Works transparently for instances of `SelectionListType` (ns=0; i=19726) and
+   * any of its subtypes, because all subtypes inherit the `Selections` mandatory
+   * property.
+   *
+   * @param nodeId - NodeId of the Variable to inspect.
+   * @returns `SelectionList` when the node has a `Selections` property, `null` otherwise.
+   * @throws When not connected or if the server returns a non-Good service status.
+   *
+   * @example
+   * ```ts
+   * const list = await client.getSelectionList(nodeId)
+   * if (list) {
+   *   list.selectionDescriptions.forEach((desc, i) =>
+   *     console.log(`[${i}] ${desc.text}:`, list.selections[i])
+   *   )
+   * }
+   * ```
+   */
+  getSelectionList(nodeId: NodeId): Promise<SelectionList | null> {
+    return this.withSessionRefresh(() => this.fetchSelectionList(nodeId))
+  }
+
+  /**
+   * Internal implementation of `getSelectionList`. Browses the node's
+   * HasProperty references to locate Selections/SelectionDescriptions/RestrictToList,
+   * then batch-reads their values.
+   */
+  private async fetchSelectionList(nodeId: NodeId): Promise<SelectionList | null> {
+    if (!this.browseService || !this.attributeService) {
+      throw new Error('Not connected: call connect() before getSelectionList()')
+    }
+
+    // Browse forward HasProperty (i=46) references to find the property nodes.
+    // SelectionListType mandates a Selections property; subtypes inherit it.
+    const description = new BrowseDescription()
+    description.nodeId = nodeId
+    description.browseDirection = BrowseDirectionEnum.Forward
+    description.referenceTypeId = HAS_PROPERTY_REF_TYPE_ID
+    description.includeSubtypes = false
+    description.nodeClassMask = 0
+    description.resultMask = BrowseResultMaskEnum.All
+
+    const browseResults = await this.browseService.browse([description])
+    const refs = browseResults[0]?.references ?? []
+
+    let selectionsNodeId: NodeId | undefined
+    let selectionsDescNodeId: NodeId | undefined
+    let restrictToListNodeId: NodeId | undefined
+
+    for (const ref of refs) {
+      const name = ref.browseName?.name
+      if (name === 'Selections') {
+        selectionsNodeId = ref.nodeId.nodeId
+      } else if (name === 'SelectionDescriptions') {
+        selectionsDescNodeId = ref.nodeId.nodeId
+      } else if (name === 'RestrictToList') {
+        restrictToListNodeId = ref.nodeId.nodeId
+      }
+    }
+
+    // Selections is mandatory on SelectionListType; if absent, this is not a SelectionListType variable.
+    if (!selectionsNodeId) {
+      return null
+    }
+
+    // Batch-read all found property nodes in a single request.
+    const nodeIdsToRead: NodeId[] = [selectionsNodeId]
+    if (selectionsDescNodeId) nodeIdsToRead.push(selectionsDescNodeId)
+    if (restrictToListNodeId) nodeIdsToRead.push(restrictToListNodeId)
+
+    const readResults = await this.attributeService.ReadValue(nodeIdsToRead)
+
+    // Navigate the Variant wrapper: ReadValue returns DataValue.value which is a Variant;
+    // the actual property value lives one level deeper in Variant.value.
+    const selectionsVariant = readResults[0]?.value as { value?: unknown } | undefined
+    const selections: unknown[] = Array.isArray(selectionsVariant?.value)
+      ? (selectionsVariant.value as unknown[])
+      : []
+
+    let selectionDescriptions: LocalizedText[] = []
+    let descReadIdx = 1
+    if (selectionsDescNodeId) {
+      const descVariant = readResults[descReadIdx]?.value as { value?: unknown } | undefined
+      if (Array.isArray(descVariant?.value)) {
+        selectionDescriptions = descVariant.value as LocalizedText[]
+      }
+      descReadIdx++
+    }
+
+    let restrictToList = false
+    if (restrictToListNodeId) {
+      const rtlVariant = readResults[descReadIdx]?.value as { value?: unknown } | undefined
+      if (typeof rtlVariant?.value === 'boolean') {
+        restrictToList = rtlVariant.value
+      }
+    }
+
+    return { nodeId, selections, selectionDescriptions, restrictToList }
   }
 
   /**
