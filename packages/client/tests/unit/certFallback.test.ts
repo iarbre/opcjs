@@ -17,7 +17,13 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { StatusCode } from 'opcjs-base'
+import {
+  EndpointDescription,
+  NodeId,
+  StatusCode,
+  UserTokenPolicy,
+  UserTokenTypeEnum,
+} from 'opcjs-base'
 
 import { ConfigurationClient } from '../../src/configuration/configurationClient.js'
 import { CertificateRequiredError, CERTIFICATE_REQUIRED_STATUS_CODES } from '../../src/sessions/certificateRequiredError.js'
@@ -45,8 +51,7 @@ function makeConfig(cfg: Partial<ConfigurationClient> = {}): ConfigurationClient
 }
 
 /** Minimal endpoint that satisfies the anonymous-token lookup in Session.activateSession. */
-function makeMinimalEndpoint() {
-  const { EndpointDescription, UserTokenPolicy, UserTokenTypeEnum } = require('opcjs-base')
+function makeMinimalEndpoint(): EndpointDescription {
   const ep = new EndpointDescription()
   const policy = new UserTokenPolicy()
   policy.tokenType = UserTokenTypeEnum.Anonymous
@@ -71,12 +76,8 @@ function injectSessionService(
   handler: SessionHandler,
   createSessionResponses: Array<{ throws?: unknown; result?: ReturnType<typeof makeFakeSessionResult> }>,
 ): { createSessionMock: ReturnType<typeof vi.fn> } {
-  const ep = makeMinimalEndpoint()
-  const { NodeId } = require('opcjs-base')
-  const authToken = NodeId.newTwoByte(42)
-
   let callIndex = 0
-  const createSessionMock = vi.fn(async (_cert: unknown) => {
+  const createSessionMock = vi.fn(async () => {
     const response = createSessionResponses[callIndex++]
     if (response.throws) throw response.throws
     return response.result!
@@ -96,7 +97,6 @@ function injectSessionService(
 }
 
 function makeFakeSessionResult() {
-  const { NodeId } = require('opcjs-base')
   const ep = makeMinimalEndpoint()
   return { sessionId: 1, authToken: NodeId.newTwoByte(42), endpoint: ep }
 }
