@@ -598,6 +598,37 @@ export class Client {
   }
 
   /**
+   * Switches the active user identity for the current session by calling ActivateSession
+   * with a new identity token (OPC UA Part 4, Section 5.7.3 — Session Client Impersonate
+   * conformance unit).
+   *
+   * The server re-evaluates authorisation under the new identity while keeping all existing
+   * Subscriptions and MonitoredItems intact. The new identity is also stored so that any
+   * subsequent auto-reconnect or session refresh uses it instead of the original identity.
+   *
+   * @param identity - The new user identity to apply to the session.
+   * @throws {Error} When not connected (call `connect()` first).
+   * @throws {Error} When the server rejects the identity (e.g. `BadIdentityTokenRejected`
+   *   or `BadUserAccessDenied`).
+   *
+   * @example
+   * ```ts
+   * await client.connect()
+   * // ... work as the original user ...
+   * await client.impersonate(UserIdentity.newWithUserName('admin', 'secret'))
+   * // ... subsequent calls run under the admin identity ...
+   * ```
+   */
+  async impersonate(identity: UserIdentity): Promise<void> {
+    if (!this.session) {
+      throw new Error('Not connected: call connect() before impersonate()')
+    }
+    await this.session.impersonate(identity)
+    // Store the new identity so that reconnect / session refresh uses it.
+    this.identity = identity
+  }
+
+  /**
    * The `requestHandle` value that was assigned to the most recently issued
    * service request in this session.
    *

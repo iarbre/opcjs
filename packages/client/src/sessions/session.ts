@@ -43,6 +43,23 @@ export class Session {
     }
 
     /**
+     * Switches the active user identity for this session by calling ActivateSession with
+     * a new identity token (OPC UA Part 4, Section 5.7.3 — Session Client Impersonate
+     * conformance unit).
+     *
+     * The server re-evaluates authorisation for the session under the new identity.
+     * All existing Subscriptions and MonitoredItems are preserved; only the security
+     * context changes.
+     *
+     * @param identity - The new user identity to apply to the session.
+     * @throws When the server returns a non-Good ServiceResult (e.g. `BadIdentityTokenRejected`
+     *   or `BadUserAccessDenied`).
+     */
+    async impersonate(identity: UserIdentity): Promise<void> {
+        await this.activateSession(identity)
+    }
+
+    /**
      * Closes the session on the server (OPC UA Part 4, Section 5.7.4).
      * @param deleteSubscriptions - When true the server deletes all Subscriptions
      *   tied to this Session. Defaults to true.
