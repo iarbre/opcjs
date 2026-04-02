@@ -24,12 +24,15 @@
   ],
   "scripts": {
     "lint": "eslint ./src",
-    "verify": "npx tsc --noEmit",
-    "verify:test": "npx tsc -p tsconfig.test.json --noEmit",
+    "tsc": "npx tsc --noEmit",
+    "tsc:test": "npx tsc -p tsconfig.test.json --noEmit",
     "build": "tsup",
-    "prepublish": "npm run lint && npm run verify && npm run verify:test && npm run build && npm run test",
+    "verify": "npm run lint && npm run tsc && npm run tsc:test && npm run build && npm run test:unit",
     "dev": "tsup --watch",
     "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:int": "vitest run tests/integration",
+    "test:dev": "vitest",
     "generate": "node ../generator/dist/cli.js ../../../ext/UA-NodeSet/Schema/Opc.Ua.NodeSet2.Services.xml -o src/schema"
   },
   "keywords": [

@@ -7,7 +7,6 @@
 
 import type { IReader } from '../../interfaces/iReader.js';
 import type { IWriter } from '../../interfaces/iWriter.js';
-import { CodecError } from '../../codecError.js';
 import { QualifiedName } from '../../../types/qualifiedName.js';
 
 /**
@@ -16,9 +15,10 @@ import { QualifiedName } from '../../../types/qualifiedName.js';
  */
 export function decodeQualifiedName(reader: IReader): QualifiedName {
   const namespaceIndex = reader.readUInt16();
-  const name = reader.readString();
-  // OPC UA allows a null name for QualifiedName (e.g. in ReadValueId.dataEncoding).
-  return new QualifiedName(namespaceIndex, name as string | null);
+  // OPC UA allows a null name (encoded as -1 length) for QualifiedName.
+  // Treat null as empty string — both mean "no name" in fields like dataEncoding.
+  const name = reader.readString() ?? '';
+  return new QualifiedName(namespaceIndex, name);
 }
 
 /**

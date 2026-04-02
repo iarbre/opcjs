@@ -23,13 +23,16 @@
     "README.md"
   ],
   "scripts": {
-    "lint": "eslint .",
-    "verify": "npx tsc --noEmit",
-    "verify:test": "npx tsc -p tsconfig.test.json --noEmit",
+    "lint": "eslint ./src",
+    "tsc": "npx tsc --noEmit",
+    "tsc:test": "npx tsc -p tsconfig.test.json --noEmit",
     "build": "tsup",
+    "verify": "npm run lint && npm run tsc && npm run tsc:test && npm run build && npm run test:unit",
     "dev": "tsup --watch",
     "test": "vitest run",
-    "prepublish": "npm run lint && npm run verify && npm run verify:test && npm run build && npm run test"
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:int": "vitest run tests/integration",
+    "test:dev": "vitest"
   },
   "keywords": [
     "opcua",

@@ -6,7 +6,7 @@
  * tears everything down.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { StatusCode, NodeId, TimestampsToReturnEnum } from 'opcjs-base'
+import { StatusCode, NodeId } from 'opcjs-base'
 import { OpcUaServer } from '../../src/opcUaServer.js'
 import { NodeClient } from './nodeClient.js'
 

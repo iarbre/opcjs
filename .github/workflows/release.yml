@@ -17,11 +17,11 @@
 #
 # Steps:
 #   1. Validate the branch name and extract MAJOR, MINOR, CHANNEL.
-#   2. Discover publishable packages (have "prepublish" script, not in EXCLUDED_PACKAGES).
+#   2. Discover publishable packages (have "verify" script, not in EXCLUDED_PACKAGES).
 #   3. Install dependencies.
 #   4. Compute the next free patch version per package by querying npmjs.
 #   5. Set the computed version in each package.json (no commit).
-#   6. Build all packages via "prepublish" (lint + typecheck + build + unit tests).
+#   6. Build all packages via "verify" (lint + typecheck + build + unit tests).
 #   7. Dry-run publish all packages — abort if any would fail.
 #   8. Publish all packages to npm with --tag <CHANNEL>.
 #   9. Create a GitHub release and git tag.
@@ -92,8 +92,8 @@ jobs:
               echo "Skipping excluded package: $name"
               continue
             fi
-            if ! node -e "const p=require('./${pkg}package.json'); process.exit(p.scripts&&p.scripts.prepublish?0:1)" 2>/dev/null; then
-              echo "Skipping package without prepublish script: $name"
+            if ! node -e "const p=require('./${pkg}package.json'); process.exit(p.scripts&&p.scripts.verify?0:1)" 2>/dev/null; then
+              echo "Skipping package without verify script: $name"
               continue
             fi
             DIRS+=("$name")
@@ -165,7 +165,7 @@ jobs:
         run: |
           for pkg in ${{ steps.packages.outputs.list }}; do
             echo "=== build: packages/${pkg} ==="
-            npm run prepublish --prefix "packages/${pkg}"
+            npm run verify --prefix "packages/${pkg}"
           done
 
       - name: Dry-run publish (pre-check — no packages are published yet)

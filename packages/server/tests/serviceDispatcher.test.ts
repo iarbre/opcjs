@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 import {
   ActivateSessionRequest,
+  ActivateSessionResponse,
   AnonymousIdentityToken,
   CloseSessionRequest,
   CreateSessionRequest,
@@ -13,11 +14,13 @@ import {
   GetEndpointsRequest,
   GetEndpointsResponse,
   NodeId,
+  QualifiedName,
   ReadRequest,
   ReadResponse,
   ReadValueId,
   RequestHeader,
   ServiceFault,
+  SignatureData,
   StatusCode,
 } from 'opcjs-base'
 
@@ -149,14 +152,14 @@ describe('SessionService (via dispatcher)', () => {
     const asReq = new ActivateSessionRequest()
     asReq.requestHeader = makeRequestHeader(authToken)
     asReq.userIdentityToken = makeAnonToken()
-    asReq.clientSignature = null
+    asReq.clientSignature = new SignatureData()
     asReq.clientSoftwareCertificates = []
     asReq.localeIds = []
-    asReq.userTokenSignature = null
+    asReq.userTokenSignature = new SignatureData()
 
     const asRes = await dispatcher.dispatch(asReq, 1)
     expect(asRes.constructor.name).toBe('ActivateSessionResponse')
-    expect((asRes as { responseHeader: { serviceResult: StatusCode } }).responseHeader.serviceResult)
+    expect((asRes as unknown as ActivateSessionResponse).responseHeader.serviceResult)
       .toBe(StatusCode.Good)
   })
 
@@ -175,10 +178,10 @@ describe('SessionService (via dispatcher)', () => {
     const asReq = new ActivateSessionRequest()
     asReq.requestHeader = makeRequestHeader(authToken)
     asReq.userIdentityToken = makeAnonToken()
-    asReq.clientSignature = null
+    asReq.clientSignature = new SignatureData()
     asReq.clientSoftwareCertificates = []
     asReq.localeIds = []
-    asReq.userTokenSignature = null
+    asReq.userTokenSignature = new SignatureData()
     await dispatcher.dispatch(asReq, 1)
 
     const clReq = new CloseSessionRequest()
@@ -265,10 +268,10 @@ describe('ServiceDispatcher session validation', () => {
     const asReq = new ActivateSessionRequest()
     asReq.requestHeader = makeRequestHeader(csRes.authenticationToken)
     asReq.userIdentityToken = makeAnonToken()
-    asReq.clientSignature = null
+    asReq.clientSignature = new SignatureData()
     asReq.clientSoftwareCertificates = []
     asReq.localeIds = []
-    asReq.userTokenSignature = null
+    asReq.userTokenSignature = new SignatureData()
     await dispatcher.dispatch(asReq, 1)
 
     // Inject a custom IOpcType with a requestHeader that has the valid authToken.
@@ -308,17 +311,17 @@ describe('AttributeService', () => {
     const asReq = new ActivateSessionRequest()
     asReq.requestHeader = makeRequestHeader(authToken)
     asReq.userIdentityToken = makeAnonToken()
-    asReq.clientSignature = null
+    asReq.clientSignature = new SignatureData()
     asReq.clientSoftwareCertificates = []
     asReq.localeIds = []
-    asReq.userTokenSignature = null
+    asReq.userTokenSignature = new SignatureData()
     await dispatcher.dispatch(asReq, 1)
 
     const item = new ReadValueId()
     item.nodeId = new NodeId(0, 2253)
     item.attributeId = 13 // Value
     item.indexRange = null
-    item.dataEncoding = null
+    item.dataEncoding = new QualifiedName(0, "")
 
     const rdReq = new ReadRequest()
     rdReq.requestHeader = makeRequestHeader(authToken)
@@ -355,7 +358,7 @@ describe('AttributeService', () => {
     item.nodeId = new NodeId(0, 1)
     item.attributeId = 13
     item.indexRange = null
-    item.dataEncoding = null
+    item.dataEncoding = new QualifiedName(0, "")
 
     const req = new ReadRequest()
     req.requestHeader = makeRequestHeader()
@@ -391,7 +394,7 @@ describe('AttributeService', () => {
     item.nodeId = new NodeId(0, 1)
     item.attributeId = 13
     item.indexRange = null
-    item.dataEncoding = null
+    item.dataEncoding = new QualifiedName(0, "")
 
     const req = new ReadRequest()
     req.requestHeader = makeRequestHeader()
@@ -425,7 +428,7 @@ describe('AttributeService', () => {
     item.nodeId = new NodeId(0, 1)
     item.attributeId = 13
     item.indexRange = null
-    item.dataEncoding = null
+    item.dataEncoding = new QualifiedName(0, "")
 
     const req = new ReadRequest()
     req.requestHeader = makeRequestHeader()

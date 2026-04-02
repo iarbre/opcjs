@@ -1,8 +1,8 @@
 # CI workflow — runs on every push to main and prerelease branches (v<M>.<m>-<channel>).
 #
 # Steps:
-#   1. Discover all publishable packages (have a "prepublish" script, not in EXCLUDED_PACKAGES).
-#   2. Build each package via "prepublish" (lint + type-check + build + unit tests).
+#   1. Discover all publishable packages (have a "verify" script, not in EXCLUDED_PACKAGES).
+#   2. Build each package via "verify" (lint + type-check + build + unit tests).
 #      Unit tests run with OPCUA_EXTERNAL_SERVER=1 (embedded in each package's test script)
 #      so no live OPC UA server is needed in CI.
 #
@@ -46,8 +46,8 @@ jobs:
               echo "Skipping excluded package: $name"
               continue
             fi
-            if ! node -e "const p=require('./${pkg}package.json'); process.exit(p.scripts&&p.scripts.prepublish?0:1)" 2>/dev/null; then
-              echo "Skipping package without prepublish script: $name"
+            if ! node -e "const p=require('./${pkg}package.json'); process.exit(p.scripts&&p.scripts.verify?0:1)" 2>/dev/null; then
+              echo "Skipping package without verify script: $name"
               continue
             fi
             DIRS+=("$name")
@@ -62,5 +62,5 @@ jobs:
         run: |
           for pkg in ${{ steps.packages.outputs.list }}; do
             echo "=== build: packages/${pkg} ==="
-            npm run prepublish --prefix "packages/${pkg}"
+            npm run verify --prefix "packages/${pkg}"
           done
