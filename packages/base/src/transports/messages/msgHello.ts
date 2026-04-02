@@ -1,4 +1,5 @@
 
+import { IReader } from "../../codecs/interfaces/iReader";
 import { IWriter } from "../../codecs/interfaces/iWriter";
 import { MsgBase } from "./msgBase";
 import { MsgHeader } from "./msgHeader";
@@ -15,6 +16,18 @@ export class MsgHello extends MsgBase{
         public MaxChunkCount: number,
         public EndpointUrl: string) {
             super(new MsgHeader(MsgTypeHello, 0));
+    }
+
+    static decode(header: MsgHeader, buffer: IReader): MsgHello {
+        const msg = new MsgHello(0, 0, 0, 0, 0, '');
+        msg.header = header;
+        msg.ProtocolVersion = buffer.readUInt32();
+        msg.ReceiveBufferSize = buffer.readUInt32();
+        msg.SendBufferSize = buffer.readUInt32();
+        msg.MaxMessageSize = buffer.readUInt32();
+        msg.MaxChunkCount = buffer.readUInt32();
+        msg.EndpointUrl = buffer.readString() as string;
+        return msg;
     }
 
     encode(buffer: IWriter) {

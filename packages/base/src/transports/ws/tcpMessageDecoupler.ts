@@ -23,7 +23,10 @@ export class TcpMessageDecoupler extends TransformStream<Uint8Array, Uint8Array>
           break;
 
         case MsgTypeHello:
-          this.logger.error("Unexpected Hello message from server.");
+          // Pass Hello bytes through so a server-side TransformStream can handle
+          // them; on the client this path is never reached in practice.
+          this.logger.debug("Received Hello message, passing through to pipeline.");
+          controller.enqueue(chunk.subarray(0, header.messageSize));
           break;
 
         case MsgTypeError:
@@ -45,6 +48,7 @@ export class TcpMessageDecoupler extends TransformStream<Uint8Array, Uint8Array>
     }
   }
 
+  /** @param onTcpMessage Callback for TCP-level Ack/Error messages from the remote. */
   constructor(private onTcpMessage: (message: MsgBase) => void) {
     super({
       transform: (chunk, controller) => this.transform(chunk, controller),

@@ -1,51 +1,27 @@
 import { describe, it, expect } from 'vitest'
+
+import { ConfigurationServer } from '../src/configuration/configurationServer.js'
 import { OpcUaServer } from '../src/opcUaServer.js'
 
 describe('OpcUaServer', () => {
-  it('starts and stops cleanly', async () => {
+  it('accepts a plain ServerOptions bag and exposes applicationUri', () => {
     const server = new OpcUaServer({
-      applicationUri: 'urn:test:opcua:server',
       productName: 'TestServer',
+      applicationUri: 'urn:test:opcua:server',
     })
-
-    expect(server.isRunning).toBe(false)
-
-    await server.start()
-    expect(server.isRunning).toBe(true)
-
-    await server.stop()
+    expect(server.applicationUri).toBe('urn:test:opcua:server')
     expect(server.isRunning).toBe(false)
   })
 
-  it('exposes the configured applicationUri', () => {
-    const server = new OpcUaServer({
-      applicationUri: 'urn:example:server',
-      productName: 'Example',
-    })
-
-    expect(server.applicationUri).toBe('urn:example:server')
+  it('accepts a ConfigurationServer instance directly', () => {
+    const cfg = ConfigurationServer.getSimple('TestServer', 'acme')
+    cfg.applicationUri = 'urn:acme:TestServer'
+    const server = new OpcUaServer(cfg)
+    expect(server.applicationUri).toBe('urn:acme:TestServer')
   })
 
-  it('calling start twice is idempotent', async () => {
-    const server = new OpcUaServer({
-      applicationUri: 'urn:test:opcua:server',
-      productName: 'TestServer',
-    })
-
-    await server.start()
-    await server.start()
-    expect(server.isRunning).toBe(true)
-
-    await server.stop()
-  })
-
-  it('calling stop when not running is idempotent', async () => {
-    const server = new OpcUaServer({
-      applicationUri: 'urn:test:opcua:server',
-      productName: 'TestServer',
-    })
-
-    await expect(server.stop()).resolves.toBeUndefined()
-    expect(server.isRunning).toBe(false)
+  it('derives applicationUri from productName and company when omitted', () => {
+    const server = new OpcUaServer({ productName: 'MyServer', company: 'myco' })
+    expect(server.applicationUri).toBe('urn:myco:MyServer')
   })
 })

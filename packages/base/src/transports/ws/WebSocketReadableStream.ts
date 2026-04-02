@@ -1,9 +1,9 @@
 import { getLogger } from "../../utils/logger/loggerProvider";
-import { WebSocketFascade } from "./webSocketFascade";
+import type { WebSocketLike } from "./webSocketLike";
 
 // ─── Readable stream ──────────────────────────────────────────────────────────
 export class WebSocketReadableStream extends ReadableStream<Uint8Array> {
-  private readonly ws: WebSocketFascade;
+  private readonly ws: WebSocketLike;
   private readonly maxBufferedMessages: number;
   private readonly logger = getLogger("transport.WebSocketReadableStream");
   private buffer: Uint8Array[] = [];
@@ -78,25 +78,12 @@ export class WebSocketReadableStream extends ReadableStream<Uint8Array> {
     this.cleanup();
   }
 
-  private wsOnMessage(event: MessageEvent){
-      const data: unknown = event.data;
-      let chunk: Uint8Array | undefined;
-
-      if (data instanceof ArrayBuffer) {
-        chunk = new Uint8Array(data);
-      } else if (data instanceof Uint8Array) {
-        chunk = data;
-      } else {
-        this.logger.warn("Received non-binary WebSocket message, ignoring");
-      }
-
-      if (chunk) {
-        this.logger.trace("WebSocket received data of size", chunk.byteLength, "bytes");
-        this.bufferPush(chunk);
-      }
+  private wsOnMessage(data: Uint8Array): void {
+      this.logger.trace("WebSocket received data of size", data.byteLength, "bytes");
+      this.bufferPush(data);
     }
 
-  constructor(ws: WebSocketFascade, maxBufferedMessages: number) {
+  constructor(ws: WebSocketLike, maxBufferedMessages: number) {
     super({
       pull: (controller) => this.sourceOnPull(controller),
       cancel: (reason) => this.sourceOnCancel(reason),

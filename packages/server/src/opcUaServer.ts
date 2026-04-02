@@ -1,56 +1,91 @@
-import { getLogger, initLoggerProvider, LoggerFactory, ConsoleSink } from 'opcjs-base'
+
+import { getLogger, initLoggerProvider } from 'opcjs-base'
 import type { ILogger } from 'opcjs-base'
-import type { ServerOptions } from './serverOptions.js'
+
+import { ConfigurationServer, type ServerOptions } from './configuration/configurationServer.js'
+import { WebSocketListener } from './transport/webSocketListener.js'
+import { ConnectionHandler } from './transport/connectionHandler.js'
+import type { ServerServiceHandler } from './secureChannel/secureChannelServer.js'
 
 /**
  * Entry point for an OPC UA server.
  *
- * Runs in Node.js (TCP transport) and in the browser (WebSocket transport).
- * Start the server with {@link start} and stop it cleanly with {@link stop}.
+ * Accepts a {@link ConfigurationServer} for full control, or a plain
+ * {@link ServerOptions} bag which is converted via
+ * {@link ConfigurationServer.fromOptions}.
+ *
+ * Uses WebSocket transport with SecurityPolicy None and anonymous
+ * authentication.  Start with {@link start} and stop cleanly with {@link stop}.
  */
 export class OpcUaServer {
-  private readonly _options: ServerOptions
-  private readonly _logger: ILogger
-  private _running = false
+  private readonly config: ConfigurationServer
+  private readonly logger: ILogger
+  private running = false
+  private listener?: WebSocketListener
 
-  constructor(options: ServerOptions) {
-    this._options = options
+  constructor(optionsOrConfig: ServerOptions | ConfigurationServer) {
+    this.config =
+      optionsOrConfig instanceof ConfigurationServer
+        ? optionsOrConfig
+        : ConfigurationServer.fromOptions(optionsOrConfig)
 
-    // Set up logging: use the provided factory or fall back to a console sink.
-    const factory = options.loggerFactory ?? new LoggerFactory([new ConsoleSink()])
-    initLoggerProvider(factory)
-    this._logger = getLogger('OpcUaServer')
+    initLoggerProvider(this.config.loggerFactory)
+    this.logger = getLogger('OpcUaServer')
   }
 
   /** Whether the server is currently running. */
   get isRunning(): boolean {
-    return this._running
+    return this.running
   }
 
-  /** Application URI as supplied in {@link ServerOptions}. */
+  /** Application URI from the configuration. */
   get applicationUri(): string {
-    return this._options.applicationUri
+    return this.config.applicationUri
   }
 
-  /** Start the server. Resolves when the server is ready to accept connections. */
+  /** The OPC UA endpoint URL (available after {@link start} completes). */
+  get endpointUrl(): string {
+    const cfg = this.config
+    return `opc.wss://${cfg.hostname}:${cfg.port}${cfg.endpointPath}`
+  }
+
+  /** Starts the server. Resolves when the listener is bound and ready. */
   async start(): Promise<void> {
-    if (this._running) {
+    if (this.running) {
       return
     }
-    this._logger.info(`Starting OPC UA server "${this._options.productName}" (${this._options.applicationUri})`)
-    // TODO: initialise transport, address space, and session manager.
-    this._running = true
-    this._logger.info('OPC UA server started')
+    this.logger.info(
+      `Starting OPC UA server "${this.config.productName}" (${this.config.applicationUri})`,
+    )
+
+    const url = this.endpointUrl
+
+    // Placeholder service handler — replaced by the full dispatcher in Phase 3.
+    const placeholderServiceHandler: ServerServiceHandler = () =>
+      Promise.reject(new Error('Service not yet implemented'))
+
+    this.listener = new WebSocketListener(this.config.port, this.config.endpointPath, ws => {
+      new ConnectionHandler(ws, url, this.config, placeholderServiceHandler)
+    })
+
+    await this.listener.start()
+
+    this.running = true
+    this.logger.info(`OPC UA server started at ${url}`)
   }
 
-  /** Stop the server and release all resources. */
+  /** Stops the server and releases all resources. */
   async stop(): Promise<void> {
-    if (!this._running) {
+    if (!this.running) {
       return
     }
-    this._logger.info('Stopping OPC UA server')
-    // TODO: close sessions, shut down transport.
-    this._running = false
-    this._logger.info('OPC UA server stopped')
+    this.logger.info('Stopping OPC UA server')
+
+    await this.listener?.stop()
+    this.listener = undefined
+
+    this.running = false
+    this.logger.info('OPC UA server stopped')
   }
 }
+

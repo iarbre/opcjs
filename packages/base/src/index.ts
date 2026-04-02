@@ -47,6 +47,7 @@ export { LevelName } from './utils/logger/levelName.js';
 export { getLogger, initLoggerProvider } from './utils/logger/loggerProvider.js';
 
 export { WebSocketFascade } from './transports/ws/webSocketFascade.js';
+export type { WebSocketLike } from './transports/ws/webSocketLike.js';
 export { WebSocketReadableStream } from './transports/ws/WebSocketReadableStream.js';
 export { WebSocketWritableStream } from './transports/ws/WebSocketWritableStream.js';
 export { TcpMessageDecoupler } from './transports/ws/tcpMessageDecoupler.js';
@@ -60,5 +61,30 @@ export { SecureChannelTypeDecoder } from './secureChannel/secureChannelTypeDecod
 export { SecureChannelTypeEncoder } from './secureChannel/secureChannelTypeEncoder.js';
 export {SecureChannelChunkReader} from './secureChannel/secureChannelChunkReader.js';
 export {SecureChannelChunkWriter} from './secureChannel/secureChannelChunkWriter.js';
+
+// Transport-layer message types (needed by server for TCP handshake)
+export { MsgAck } from './transports/messages/msgAck.js';
+export { MsgHello } from './transports/messages/msgHello.js';
+export { MsgHeader as TcpMsgHeader } from './transports/messages/msgHeader.js';
+
+// SecureChannel message types (needed by server for channel handling)
+export type { MsgBase as ScMsgBase } from './secureChannel/messages/msgBase.js';
+export { MsgAsymmetric } from './secureChannel/messages/msgAsymmetric.js';
+export { MsgSymmetric } from './secureChannel/messages/msgSymmetric.js';
+export { MsgSecurityHeaderAsymmetric } from './secureChannel/messages/msgSecurityHeaderAsymmetric.js';
+export { MsgSecurityHeaderSymmetric } from './secureChannel/messages/msgSecurityHeaderSymmetric.js';
+export { MsgSequenceHeader } from './secureChannel/messages/msgSequenceHeader.js';
+export { MsgHeader as ScMsgHeader } from './secureChannel/messages/msgHeader.js';
+export {
+  MsgTypeOpenFinal,
+  MsgTypeOpenChunk,
+  MsgTypeAbort,
+  MsgTypeChunk,
+  MsgTypeFinal,
+  MsgTypeCloseFinal,
+} from './secureChannel/messages/msgType.js';
+
+// Certificate (needed by server for SecurityPolicy.getAlgorithmSymmetric)
+export { Certificate } from './certificates/certificate.js';
 
 

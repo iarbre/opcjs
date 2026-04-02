@@ -1,5 +1,5 @@
 import { getLogger } from "../../utils/logger/loggerProvider";
-import { WebSocketFascade } from "./webSocketFascade";
+import type { WebSocketLike } from "./webSocketLike";
 
 // ─── Writable stream ──────────────────────────────────────────────────────────
 export class WebSocketWritableStream extends WritableStream<Uint8Array> {
@@ -21,7 +21,7 @@ export class WebSocketWritableStream extends WritableStream<Uint8Array> {
     try { this.ws.close(); } catch { /* ignore */ }
   }
 
-  constructor(private ws: WebSocketFascade) {
+  constructor(private ws: WebSocketLike) {
     super({
       write: (chunk) => this.sinkOnWrite(chunk),
       close: () => this.sinkOnClose(),

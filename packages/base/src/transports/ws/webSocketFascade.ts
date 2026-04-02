@@ -1,4 +1,5 @@
 import { getLogger } from "../../utils/logger/loggerProvider";
+import type { WebSocketLike } from "./webSocketLike";
 
 export type WebSocketOptions = {
     endpoint: string;
@@ -6,12 +7,20 @@ export type WebSocketOptions = {
     maxBufferedMessages?: number;
 };
 
-export class WebSocketFascade {
+/**
+ * Wraps the browser WHATWG {@link WebSocket} and implements {@link WebSocketLike}.
+ *
+ * Normalises the `MessageEvent` callback to a plain `(data: Uint8Array) => void`
+ * handler so that {@link WebSocketReadableStream} works identically on client
+ * and server (where the Node.js `ws` package delivers raw `Buffer` data).
+ */
+export class WebSocketFascade implements WebSocketLike {
     private logger = getLogger("transport.WebSocketFascade");
     private webSocket?: WebSocket;
-    onMessageHandler: ((event: MessageEvent) => void) | null = null;
-    onErrorHandler: ((event: Event) => void) | null = null;
-    onCloseHandler: ((event: Event) => void) | null = null;
+    // Stored as the browser-native handler so it can be assigned to onmessage after connect().
+    private onMessageHandler: ((event: MessageEvent) => void) | null = null;
+    private onErrorHandler: ((event: Event) => void) | null = null;
+    private onCloseHandler: ((event: Event) => void) | null = null;
 
     public async connect() {
         const {
@@ -80,24 +89,34 @@ export class WebSocketFascade {
         }
     }
 
-    public setOnMessage(handler: (event: MessageEvent) => void): void {
-        this.onMessageHandler = handler;
+    public setOnMessage(handler: (data: Uint8Array) => void): void {
+        // Wrap the browser MessageEvent to extract the binary payload.
+        this.onMessageHandler = (event: MessageEvent) => {
+            const raw: unknown = event.data;
+            if (raw instanceof ArrayBuffer) {
+                handler(new Uint8Array(raw));
+            } else if (raw instanceof Uint8Array) {
+                handler(raw);
+            } else {
+                this.logger.warn("Received non-binary WebSocket message, ignoring");
+            }
+        };
         if (this.webSocket) {
-            this.webSocket.onmessage = handler;
+            this.webSocket.onmessage = this.onMessageHandler;
         }
     }
 
-    public setOnClose(handler: (event: Event) => void): void {
-        this.onCloseHandler = handler;
+    public setOnClose(handler: () => void): void {
+        this.onCloseHandler = () => handler();
         if (this.webSocket) {
-            this.webSocket.onclose = handler;
+            this.webSocket.onclose = this.onCloseHandler;
         }
     }
 
-    public setOnError(handler: (event: Event) => void): void {
-        this.onErrorHandler = handler;
+    public setOnError(handler: (err: unknown) => void): void {
+        this.onErrorHandler = (event: Event) => handler(event);
         if (this.webSocket) {
-            this.webSocket.onerror = handler;
+            this.webSocket.onerror = this.onErrorHandler;
         }
     }
 
