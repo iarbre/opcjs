@@ -53,31 +53,33 @@ Includes GetEndpoints/FindServers stubs. Tested with `opcjs-client`.
 
 ---
 
-## Phase 3: Service Dispatch & Handlers
+## Phase 3: Service Dispatch & Handlers ✅ COMPLETE
 
-*Depends on Phase 2*
+- [x] **3.1** `ServiceDispatcher` — `src/services/serviceDispatcher.ts`
+  - Routes by `instanceof`; discovery + CreateSession bypass session check
+  - Validates session via `SessionManager.validateSession()`; returns `ServiceFault` on error
+  - Echoes `requestHandle` in all response headers
+  - Returns `BadServiceUnsupported` for unknown request types
+  - `IAddressSpace` interface exposed at `src/addressSpace/iAddressSpace.ts`
 
-- [ ] **3.1** Create service dispatcher — `src/services/serviceDispatcher.ts`
-  - Routes `IOpcType` requests by type to service handlers
-  - Validates `authenticationToken` via `SessionManager` (General Service Behaviour)
-  - Echoes `requestHandle` in ResponseHeader
-  - Respects `timeoutHint`
-  - Returns `Bad_SessionIdInvalid` / `Bad_SessionClosed` for bad tokens
-  - Discovery services bypass session check
-
-- [ ] **3.2** Create server `SessionService` — `src/services/sessionService.ts`
-  - `CreateSessionRequest` → `CreateSessionResponse` (with `EndpointDescription[]`)
-  - `ActivateSessionRequest` → `ActivateSessionResponse`
+- [x] **3.2** `SessionService` — `src/services/sessionService.ts`
+  - `CreateSessionRequest` → `CreateSessionResponse` (with `EndpointDescription[]`, serverNonce, sessionId, authenticationToken)
+  - `ActivateSessionRequest` → `ActivateSessionResponse` (validates anonymous token via `SessionManager`)
   - `CloseSessionRequest` → `CloseSessionResponse`
 
-- [ ] **3.3** Create server `AttributeService` — `src/services/attributeService.ts`
-  - `ReadRequest` → `ReadResponse`
-  - Reads from address space, supports `maxAge`, `timestampsToReturn`
-  - `Bad_AttributeIdInvalid`, `Bad_NodeIdUnknown`
+- [x] **3.3** `AttributeService` — `src/services/attributeService.ts`
+  - `ReadRequest` → `ReadResponse` via `IAddressSpace.read()`
+  - Applies `timestampsToReturn` (Source / Server / Both / Neither)
+  - Returns `BadNodeIdInvalid` for null nodeId items
+  - `StubAddressSpace` (returns `BadNodeIdUnknown`) used until Phase 4
 
-- [ ] **3.4** Create `DiscoveryService` stubs — `src/services/discoveryService.ts`
+- [x] **3.4** `DiscoveryService` — `src/services/discoveryService.ts`
   - `GetEndpointsRequest` → single endpoint (SecurityPolicy None, Anonymous)
-  - `FindServersRequest` → self-description
+  - `FindServersRequest` → self-description (`ApplicationDescription`)
+
+- [x] **3.5** Wired into `OpcUaServer`
+  - Real `ServiceDispatcher` replaces placeholder handler
+  - `OpcUaServer.addressSpace` property lets callers inject a real address space
 
 ---
 
