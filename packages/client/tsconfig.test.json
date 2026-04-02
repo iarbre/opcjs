@@ -3,6 +3,7 @@
   "compilerOptions": {
     "types": ["node"],
     "noEmit": true,
+    "rootDir": ".",
     "outDir": "./dist-test"
   },
   "include": ["src/**/*", "tests/**/*"],
