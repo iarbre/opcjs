@@ -1,0 +1,52 @@
+{
+  "name": "opcjs-server",
+  "version": "0.0.0",
+  "description": "OPC UA server library for Node.js and the browser.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iarbre/opcjs.git"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "verify": "npx tsc --noEmit",
+    "verify:test": "npx tsc -p tsconfig.test.json --noEmit",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "prepublish": "npm run lint && npm run verify && npm run verify:test && npm run build && npm run test"
+  },
+  "keywords": [
+    "opcua",
+    "opc-ua",
+    "server"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "opcjs-base": "*"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.3.5",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.0",
+    "vitest": "^4.0.18"
+  }
+}

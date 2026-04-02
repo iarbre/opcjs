@@ -23,7 +23,8 @@
   "workspaces": [
     "packages/base",
     "packages/generator",
-    "packages/client"
+    "packages/client",
+    "packages/server"
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
