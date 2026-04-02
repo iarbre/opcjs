@@ -6,16 +6,16 @@ import { LevelName } from "./levelName";
 
 export function isNodeLike(): boolean {
   // Works in browsers and Node. Avoids reference errors.
-  return (
-    typeof process !== "undefined" &&
-    typeof (process as { versions?: { node?: string } }).versions !== "undefined" &&
-    typeof (process as { versions?: { node?: string } }).versions?.node !== "undefined"
-  );
+  const g = globalThis as { process?: { versions?: { node?: string } } };
+  return typeof g.process !== "undefined" &&
+    typeof g.process?.versions !== "undefined" &&
+    typeof g.process?.versions?.node !== "undefined";
 }
 
 export function supportsAnsiColors(): boolean {
   // Basic heuristic for Node TTY
-  return isNodeLike() && !!(process as { stdout?: { isTTY?: boolean } }).stdout?.isTTY;
+  const g = globalThis as { process?: { stdout?: { isTTY?: boolean } } };
+  return isNodeLike() && !!(g.process?.stdout?.isTTY);
 }
 
 function pad2(n: number): string {

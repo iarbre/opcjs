@@ -49,9 +49,7 @@ export class CodecError extends Error {
     this.cause = options?.cause;
     
     // Maintains proper stack trace for where error was thrown (V8 engines)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, CodecError);
-    }
+    (Error as { captureStackTrace?: (target: object, constructor: unknown) => void }).captureStackTrace?.(this, CodecError);
   }
 
   /**

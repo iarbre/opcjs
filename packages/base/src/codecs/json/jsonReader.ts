@@ -165,7 +165,10 @@ export class JsonReader implements IReader {
             throw new CodecError(`Expected string or null for ByteString, got ${typeof this.current}`, { format: 'JSON', typeName: 'ByteString' });
         }
         try {
-            return new Uint8Array(Buffer.from(this.current, 'base64'));
+            const binary = atob(this.current);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return bytes;
         } catch {
             throw new CodecError(`Invalid Base64 string: ${this.current}`, { format: 'JSON', typeName: 'ByteString' });
         }

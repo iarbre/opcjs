@@ -1,8 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {},
+    "paths": {
+      "opcjs-base": ["./src/index.ts"]
+    },
     "rootDir": ".",
     "noEmit": true
   },

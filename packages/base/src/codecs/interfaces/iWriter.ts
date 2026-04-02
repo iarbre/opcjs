@@ -128,7 +128,7 @@ export interface IWriter {
    * Binary: Int32 length prefix + bytes
    * @param value The byte array; null or undefined is encoded as length -1 (OPC UA null)
    */
-  writeByteString(value: Buffer | Uint8Array | null | undefined): void;
+  writeByteString(value: Uint8Array | null | undefined): void;
 
   /**
    * Encode an XmlElement value.

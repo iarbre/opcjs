@@ -81,11 +81,7 @@ export class NodeId {
         break;
       case NodeIdType.ByteString:
         prefix = 'b';
-        // Handle both Node.js and browser environments
-        if (typeof Buffer !== 'undefined') {
-          value = Buffer.from(this.identifier as Uint8Array).toString('base64');
-        } else {
-          // Browser fallback
+        {
           const bytes = this.identifier as Uint8Array;
           let binary = '';
           for (let i = 0; i < bytes.length; i++) {
@@ -153,11 +149,7 @@ export class NodeId {
       case 'g':
         return new NodeId(namespace, value); // GUID as string
       case 'b':
-        // Handle both Node.js and browser environments
-        if (typeof Buffer !== 'undefined') {
-          return new NodeId(namespace, new Uint8Array(Buffer.from(value, 'base64')));
-        } else {
-          // Browser fallback
+        {
           const binary = atob(value);
           const bytes = new Uint8Array(binary.length);
           for (let i = 0; i < binary.length; i++) {

@@ -66,7 +66,7 @@ export class WebSocketFascade {
         if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
             throw new Error(`WebSocket is not open (state=${this.webSocket?.readyState})`);
         }
-        this.webSocket.send(data);
+        this.webSocket.send(data as Uint8Array<ArrayBuffer>);
         this.logger.trace(`WebSocket sent ${data.byteLength} bytes`);
     }
 

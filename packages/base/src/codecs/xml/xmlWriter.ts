@@ -119,8 +119,11 @@ export class XmlWriter implements IWriter {
         this.writeText(value);
     }
 
-    writeByteString(value: Buffer | undefined): void {
-        this.writeText(value === undefined ? '' : value.toString('base64'));
+    writeByteString(value: Uint8Array | undefined): void {
+        if (value === undefined) { this.writeText(''); return; }
+        let binary = '';
+        for (let i = 0; i < value.length; i++) binary += String.fromCharCode(value[i]);
+        this.writeText(btoa(binary));
     }
 
     writeXmlElement(value: XmlElement | string): void {

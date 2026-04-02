@@ -166,7 +166,10 @@ export class XmlReader implements IReader {
         const text = this.getTextContent();
         if (text === '') return null;
         try {
-            return Buffer.from(text, 'base64');
+            const binary = atob(text);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return bytes;
         } catch {
             throw new CodecError(`Invalid Base64 ByteString: ${text}`);
         }

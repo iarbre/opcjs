@@ -121,7 +121,10 @@ export class JsonWriter implements IWriter {
     }
 
     writeByteString(value: Uint8Array | undefined): void {
-        this.setValue(value === undefined ? undefined : Buffer.from(value).toString('base64'));
+        if (value === undefined) { this.setValue(undefined); return; }
+        let binary = '';
+        for (let i = 0; i < value.length; i++) binary += String.fromCharCode(value[i]);
+        this.setValue(btoa(binary));
     }
 
     writeXmlElement(value: XmlElement | string): void {
