@@ -6,54 +6,50 @@ Includes GetEndpoints/FindServers stubs. Tested with `opcjs-client`.
 
 ---
 
-## Phase 1: Configuration & Transport
+## Phase 1: Configuration & Transport ✅ COMPLETE
 
-- [ ] **1.1** Create `ConfigurationServer` — `src/configuration/configurationServer.ts`
-  - Extends base `Configuration` (mirrors `ConfigurationClient.getSimple()`)
-  - Properties: `port`, `hostname`, `endpointPath`, `sessionTimeoutMs`, `maxSessions`
-  - Static `getSimple()` factory registering binary encoders/decoders
+- [x] **1.1** `ConfigurationServer` — `src/configuration/configurationServer.ts`
+  - Merged `ServerOptions` type; `fromOptions()`, `getSimple()` factories
+  - Properties: `port`, `hostname`, `endpointPath`, `minSessionTimeoutMs`, `maxSessionTimeoutMs`, `maxSessions`
 
-- [ ] **1.2** Create WebSocket listener — `src/transport/webSocketListener.ts`
-  - Uses `ws` npm package (`WebSocketServer`)
-  - Accepts incoming connections, emits per-connection callback
-  - Add `ws` + `@types/ws` to `package.json`
+- [x] **1.2** WebSocket listener — `src/transport/webSocketListener.ts`
+  - Wraps `ws.WebSocketServer`; `start()`/`stop()` as Promises; `onConnection` callback
 
-- [ ] **1.3** Create per-connection handler — `src/transport/connectionHandler.ts`
-  - Builds inbound pipeline: `TcpMessageDecoupler` → `SecureChannelMessageDecoder` → `SecureChannelChunkReader` → `SecureChannelTypeDecoder`
-  - Builds outbound pipeline: `SecureChannelTypeEncoder` → `SecureChannelChunkWriter` → `SecureChannelMessageEncoder` → `TcpMessageInjector`
-  - Owns a `SecureChannelContext` per connection
+- [x] **1.3** Per-connection handler — `src/transport/connectionHandler.ts`
+  - Full inbound + outbound pipeline using `WebSocketLike` streams from base
+  - `NodeWebSocketAdapter` bridges `ws.WebSocket` → `WebSocketLike`
+  - `TcpServerHandshakeTransform` downstream `TransformStream` handles Hello/Ack
+  - `SecureChannelServer` wired with placeholder `ServerServiceHandler`
 
-- [ ] **1.4** Create server TCP handshake — `src/transport/tcpHandshakeHandler.ts`
-  - Receives Hello, validates, sends Ack (inverse of client `TcpConnectionHandler`)
-  - Negotiates buffer sizes per OPC UA Part 6 §7.1.2
+- [x] **1.4** TCP handshake — `src/transport/tcpServerHandshakeTransform.ts`
+  - `TransformStream<Uint8Array,Uint8Array>`; intercepts Hello, sends Ack via `TcpMessageInjector`
 
-- [ ] **1.5** Create server secure channel handler — `src/secureChannel/secureChannelServer.ts`
-  - Accepts `OpenSecureChannelRequest` (Issue/Renew)
-  - Generates channelId + tokenId, manages token lifetime
-  - SecurityPolicy None only
-  - Routes subsequent requests to service dispatcher
+- [x] **1.5** Server secure channel — `src/secureChannel/secureChannelServer.ts`
+  - `OpenSecureChannelRequest` Issue/Renew; channelId/tokenId generation
+  - Routes MSG frames to injected `ServerServiceHandler`
 
-- [ ] **1.6** Base package modifications (backward-compatible)
-  - Add `static decode()` to `MsgHello` in `base/src/transports/messages/msgHello.ts`
-  - Add optional Hello callback to `TcpMessageDecoupler` in `base/src/transports/ws/tcpMessageDecoupler.ts`
+- [x] **1.6** Base package modifications
+  - `MsgHello.static decode()`, `WebSocketLike` interface
+  - Base streams updated to accept `WebSocketLike`; Hello passes through `TcpMessageDecoupler`
 
 ---
 
-## Phase 2: Session Management
+## Phase 2: Session Management ✅ COMPLETE
 
-*Depends on Phase 1*
+- [x] **2.1** `Session` type — `src/sessions/session.ts`
+  - `sessionId`, `authenticationToken`, `serverNonce`, `revisedTimeoutMs`, `boundChannelId`, `isActivated`, `createdAt`, `lastActivityAt`
 
-- [ ] **2.1** Create `Session` model — `src/sessions/session.ts`
-  - `sessionId` (NodeId), `authenticationToken` (NodeId), `serverNonce`, `timeout`, `boundChannelId`, `activated`, `createdAt`, `lastActivity`
+- [x] **2.2** `SessionManager` — `src/sessions/sessionManager.ts`
+  - `createSession(channelId, requestedTimeoutMs)`: unique NodeId pair, 32-byte nonce, clamped timeout
+  - `activateSession(authToken, userIdentityToken, channelId)`: validates anonymous token, sets `isActivated`
+  - `closeSession(authToken)`: removes session + cancels timer (idempotent)
+  - `validateSession(authToken)`: throws `SessionError(BadSessionIdInvalid/BadSessionClosed)`
+  - `touchSession(authToken)`: updates `lastActivityAt`, resets timer
+  - Enforces `maxSessions`; idle-timeout cleanup via `setTimeout`
 
-- [ ] **2.2** Create `SessionManager` — `src/sessions/sessionManager.ts`
-  - `createSession()`: unique IDs + nonce
-  - `activateSession()`: validate anonymous token, bind to channel
-  - `closeSession()`: remove state
-  - Timeout-based cleanup, max sessions cap
-
-- [ ] **2.3** Create `AnonymousAuthenticator` — `src/security/anonymousAuthenticator.ts`
-  - Validates `AnonymousIdentityToken`
+- [x] **2.3** `AnonymousAuthenticator` — `src/security/anonymousAuthenticator.ts`
+  - `validateAnonymousToken(token)`: throws `AuthenticationError(BadIdentityTokenInvalid)` for non-anonymous tokens
+  - `AuthenticationError` carries `statusCode` field
 
 ---
 

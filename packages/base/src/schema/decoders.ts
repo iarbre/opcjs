@@ -5,7 +5,7 @@
  * This file was automatically generated from OPC UA NodeSet2 XML.
  * 
  * Source: Opc.Ua.NodeSet2.Services.xml
- * Generated: 2026-03-16T04:16:36.493Z
+ * Generated: 2026-04-02T04:47:17.085Z
  * Generator: @opcua/nodeset-generator
  * 
  * Any changes made to this file will be lost when regenerated.
