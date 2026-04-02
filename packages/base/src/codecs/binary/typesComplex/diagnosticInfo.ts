@@ -79,13 +79,13 @@ export function decodeDiagnosticInfo(reader: IReader): DiagnosticInfo {
  */
 export function encodeDiagnosticInfo(writer: IWriter, value: DiagnosticInfo): void {
   let encodingMask = 0;
-  if (value.symbolicId !== null) { encodingMask |= DiagnosticInfoMaskBits.SymbolicId; }
-  if (value.namespaceUri !== null) { encodingMask |= DiagnosticInfoMaskBits.NamespaceUri; }
-  if (value.localizedText !== null) { encodingMask |= DiagnosticInfoMaskBits.LocalizedText; }
-  if (value.locale !== null) { encodingMask |= DiagnosticInfoMaskBits.Locale; }
-  if (value.additionalInfo !== null) { encodingMask |= DiagnosticInfoMaskBits.AdditionalInfo; }
-  if (value.innerStatusCode !== null) { encodingMask |= DiagnosticInfoMaskBits.InnerStatusCode; }
-  if (value.innerDiagnosticInfo !== null) { encodingMask |= DiagnosticInfoMaskBits.InnerDiagnosticInfo; }
+  if (value.symbolicId != null) { encodingMask |= DiagnosticInfoMaskBits.SymbolicId; }
+  if (value.namespaceUri != null) { encodingMask |= DiagnosticInfoMaskBits.NamespaceUri; }
+  if (value.localizedText != null) { encodingMask |= DiagnosticInfoMaskBits.LocalizedText; }
+  if (value.locale != null) { encodingMask |= DiagnosticInfoMaskBits.Locale; }
+  if (value.additionalInfo != null) { encodingMask |= DiagnosticInfoMaskBits.AdditionalInfo; }
+  if (value.innerStatusCode != null) { encodingMask |= DiagnosticInfoMaskBits.InnerStatusCode; }
+  if (value.innerDiagnosticInfo != null) { encodingMask |= DiagnosticInfoMaskBits.InnerDiagnosticInfo; }
 
   writer.writeByte(encodingMask);
 

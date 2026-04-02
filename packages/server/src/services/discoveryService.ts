@@ -32,9 +32,14 @@ export class DiscoveryService {
 
   constructor(
     private readonly config: ConfigurationServer,
-    private readonly endpointUrl: string,
+    private endpointUrl: string,
   ) {
     this.logger = getLogger('services.DiscoveryService')
+  }
+
+  /** Updates the endpoint URL after the listener has bound to an OS-assigned port. */
+  updateEndpointUrl(url: string): void {
+    this.endpointUrl = url
   }
 
   /**

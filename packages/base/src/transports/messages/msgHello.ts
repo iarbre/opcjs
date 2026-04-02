@@ -31,6 +31,11 @@ export class MsgHello extends MsgBase{
     }
 
     encode(buffer: IWriter) {
+        // Compute the total message size: 8 bytes header + 20 bytes
+        // fixed fields (5 × UInt32) + OPC UA string encoding of EndpointUrl
+        // (4-byte Int32 length prefix + UTF-8 bytes).
+        const urlBytes = new TextEncoder().encode(this.EndpointUrl);
+        this.header.messageSize = 8 + 20 + 4 + urlBytes.length;
         this.header.encode(buffer);
         buffer.writeUInt32(this.ProtocolVersion);
         buffer.writeUInt32(this.ReceiveBufferSize);

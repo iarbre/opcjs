@@ -201,10 +201,7 @@ export class BinaryWriter implements IWriter {
     this.position += 8;
   }
   public writeString(value: string | null): void {
-    let encoded = undefined
-    if (value && value !== '') {
-      encoded = new TextEncoder().encode(value);
-    }
+    const encoded = value ?new TextEncoder().encode(value): null;
     this.writeByteString(encoded);
   }
 

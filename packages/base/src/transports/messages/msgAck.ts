@@ -28,6 +28,8 @@ export class MsgAck extends MsgBase{
     }
 
     encode(buffer: IWriter) {
+        // Total message size: 8 bytes header + 5 × UInt32 body = 28 bytes.
+        this.header.messageSize = 28;
         this.header.encode(buffer);
         buffer.writeUInt32(this.ProtocolVersion);
         buffer.writeUInt32(this.ReceiveBufferSize);

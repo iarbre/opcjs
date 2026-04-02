@@ -68,12 +68,12 @@ export function decodeDataValue(reader: IReader, decoder: Decoder): DataValue {
  */
 export function encodeDataValue(writer: IWriter, value: DataValue, encoder: Encoder): void {
   let encodingMask = 0;
-  if (value.value !== null && value.value !== undefined) { encodingMask |= DataValueMaskBits.Value; }
-  if (value.statusCode !== null) { encodingMask |= DataValueMaskBits.StatusCode; }
-  if (value.sourceTimestamp !== null) { encodingMask |= DataValueMaskBits.SourceTimestamp; }
-  if (value.serverTimestamp !== null) { encodingMask |= DataValueMaskBits.ServerTimestamp; }
-  if (value.sourcePicoseconds !== null) { encodingMask |= DataValueMaskBits.SourcePicoseconds; }
-  if (value.serverPicoseconds !== null) { encodingMask |= DataValueMaskBits.ServerPicoseconds; }
+  if (value.value != null) { encodingMask |= DataValueMaskBits.Value; }
+  if (value.statusCode != null) { encodingMask |= DataValueMaskBits.StatusCode; }
+  if (value.sourceTimestamp != null) { encodingMask |= DataValueMaskBits.SourceTimestamp; }
+  if (value.serverTimestamp != null) { encodingMask |= DataValueMaskBits.ServerTimestamp; }
+  if (value.sourcePicoseconds != null) { encodingMask |= DataValueMaskBits.SourcePicoseconds; }
+  if (value.serverPicoseconds != null) { encodingMask |= DataValueMaskBits.ServerPicoseconds; }
 
   writer.writeByte(encodingMask);
 

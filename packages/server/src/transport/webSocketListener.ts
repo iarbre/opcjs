@@ -1,6 +1,6 @@
 import { getLogger } from 'opcjs-base'
 import { WebSocketServer } from 'ws'
-import type { WebSocket as WsWebSocket } from 'ws'
+import type { WebSocket as WsWebSocket, AddressInfo } from 'ws'
 
 /**
  * Listens for incoming OPC UA WebSocket connections.
@@ -13,6 +13,16 @@ import type { WebSocket as WsWebSocket } from 'ws'
 export class WebSocketListener {
   private readonly logger = getLogger('transport.WebSocketListener')
   private server?: WebSocketServer
+  private _boundPort = 0
+
+  /**
+   * The actual TCP port the server is listening on.
+   * Equals the configured port once {@link start} resolves; when the configured
+   * port is `0` the OS-assigned port is returned.
+   */
+  get boundPort(): number {
+    return this._boundPort
+  }
 
   /**
    * Starts listening. Resolves when the server is bound and ready to accept
@@ -33,7 +43,11 @@ export class WebSocketListener {
       })
 
       this.server.on('listening', () => {
-        this.logger.info(`WebSocket server listening on port ${this.port}, path ${this.path}`)
+        const addr = this.server?.address() as AddressInfo | null
+        if (addr != null) {
+          this._boundPort = addr.port
+        }
+        this.logger.info(`WebSocket server listening on port ${this._boundPort}, path ${this.path}`)
         resolve()
       })
     })

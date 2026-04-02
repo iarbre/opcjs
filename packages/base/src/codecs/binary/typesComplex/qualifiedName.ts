@@ -17,10 +17,8 @@ import { QualifiedName } from '../../../types/qualifiedName.js';
 export function decodeQualifiedName(reader: IReader): QualifiedName {
   const namespaceIndex = reader.readUInt16();
   const name = reader.readString();
-  if (name === null) {
-    throw new CodecError('QualifiedName name cannot be null');
-  }
-  return new QualifiedName(namespaceIndex, name);
+  // OPC UA allows a null name for QualifiedName (e.g. in ReadValueId.dataEncoding).
+  return new QualifiedName(namespaceIndex, name as string | null);
 }
 
 /**

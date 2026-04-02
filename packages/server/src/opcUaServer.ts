@@ -60,7 +60,8 @@ export class OpcUaServer {
   /** The OPC UA endpoint URL (available after {@link start} completes). */
   get endpointUrl(): string {
     const cfg = this.config
-    return `opc.wss://${cfg.hostname}:${cfg.port}${cfg.endpointPath}`
+    const port = this.listener?.boundPort ?? cfg.port
+    return `opc.wss://${cfg.hostname}:${port}${cfg.endpointPath}`
   }
 
   /** Starts the server. Resolves when the listener is bound and ready. */
@@ -72,19 +73,26 @@ export class OpcUaServer {
       `Starting OPC UA server "${this.config.productName}" (${this.config.applicationUri})`,
     )
 
-    const url = this.endpointUrl
     const sessionManager = new SessionManager(this.config)
     this.sessionManager = sessionManager
-    const sessionSvc = new SessionService(sessionManager, this.config, url)
+    const sessionSvc = new SessionService(sessionManager, this.config, this.config.endpointPath)
     const attributeSvc = new AttributeService(this.addressSpace)
-    const discoverySvc = new DiscoveryService(this.config, url)
+    const discoverySvc = new DiscoveryService(this.config, this.config.endpointPath)
     const dispatcher = new ServiceDispatcher(sessionManager, sessionSvc, attributeSvc, discoverySvc)
 
     this.listener = new WebSocketListener(this.config.port, this.config.endpointPath, ws => {
+      // endpointUrl is evaluated lazily here — the listener is already bound so
+      // this.listener.boundPort returns the actual OS-assigned port.
+      const url = this.endpointUrl
       new ConnectionHandler(ws, url, this.config, (req, channelId) => dispatcher.dispatch(req, channelId))
     })
 
     await this.listener.start()
+
+    // Re-evaluate after start() so the actual bound port is used for services.
+    const url = this.endpointUrl
+    sessionSvc.updateEndpointUrl(url)
+    discoverySvc.updateEndpointUrl(url)
 
     this.running = true
     this.logger.info(`OPC UA server started at ${url}`)

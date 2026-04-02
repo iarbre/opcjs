@@ -90,7 +90,7 @@ export class ExtensionObject {
    * @returns A new ExtensionObject with Binary encoding
    */
   public static newBinary(data: IOpcType): ExtensionObject {
-    return new ExtensionObject(new NodeId(0, data.getTypeId()), ExtensionObjectEncoding.Binary, data);
+    return new ExtensionObject(new NodeId(0, data.getBinaryEncodingId()), ExtensionObjectEncoding.Binary, data);
   }
 
   /**
