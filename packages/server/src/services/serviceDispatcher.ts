@@ -1,15 +1,23 @@
 import {
   ActivateSessionRequest,
   CloseSessionRequest,
+  CreateMonitoredItemsRequest,
   CreateSessionRequest,
+  CreateSubscriptionRequest,
+  DeleteMonitoredItemsRequest,
+  DeleteSubscriptionsRequest,
   DiagnosticInfo,
   ExtensionObject,
   FindServersRequest,
   GetEndpointsRequest,
+  ModifySubscriptionRequest,
   NodeId,
+  PublishRequest,
   ReadRequest,
+  RepublishRequest,
   ResponseHeader,
   ServiceFault,
+  SetPublishingModeRequest,
   StatusCode,
   getLogger,
 } from 'opcjs-base'
@@ -19,7 +27,9 @@ import { SessionError } from '../sessions/sessionManager.js'
 import type { SessionManager } from '../sessions/sessionManager.js'
 import type { AttributeService } from './attributeService.js'
 import type { DiscoveryService } from './discoveryService.js'
+import type { MonitoredItemService } from './monitoredItemService.js'
 import type { SessionService } from './sessionService.js'
+import type { SubscriptionService } from './subscriptionService.js'
 
 /**
  * Routes decoded OPC UA service requests to the appropriate handler.
@@ -42,6 +52,8 @@ export class ServiceDispatcher {
     private readonly sessionSvc: SessionService,
     private readonly attributeSvc: AttributeService,
     private readonly discoverySvc: DiscoveryService,
+    private readonly subscriptionSvc: SubscriptionService,
+    private readonly monitoredItemSvc: MonitoredItemService,
   ) {
     this.logger = getLogger('services.ServiceDispatcher')
   }
@@ -93,6 +105,31 @@ export class ServiceDispatcher {
       // Session is guaranteed valid after validateSession above.
       const session = this.sessionManager.validateSession(authToken)
       return this.attributeSvc.read(request, session)
+    }
+    if (request instanceof CreateSubscriptionRequest) {
+      const session = this.sessionManager.validateSession(authToken)
+      return this.subscriptionSvc.createSubscription(request, session)
+    }
+    if (request instanceof ModifySubscriptionRequest) {
+      return this.subscriptionSvc.modifySubscription(request, authToken)
+    }
+    if (request instanceof DeleteSubscriptionsRequest) {
+      return this.subscriptionSvc.deleteSubscriptions(request, authToken)
+    }
+    if (request instanceof SetPublishingModeRequest) {
+      return this.subscriptionSvc.setPublishingMode(request, authToken)
+    }
+    if (request instanceof PublishRequest) {
+      return this.subscriptionSvc.publish(request, authToken)
+    }
+    if (request instanceof RepublishRequest) {
+      return this.subscriptionSvc.republish(request, authToken)
+    }
+    if (request instanceof CreateMonitoredItemsRequest) {
+      return this.monitoredItemSvc.createMonitoredItems(request, authToken)
+    }
+    if (request instanceof DeleteMonitoredItemsRequest) {
+      return this.monitoredItemSvc.deleteMonitoredItems(request, authToken)
     }
 
     this.logger.warn(`Unhandled request type: ${request.constructor.name}`)

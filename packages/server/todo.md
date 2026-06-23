@@ -157,6 +157,53 @@ Includes GetEndpoints/FindServers stubs. Tested with `opcjs-client`.
 | Security | SecurityPolicy None only, no certs/encryption |
 | Authentication | Anonymous only (`AnonymousIdentityToken`) |
 | Transport | WebSocket only (no raw TCP) |
-| Scope exclusions | No subscriptions, browse, write |
+| Scope exclusions | No browse, write |
 | Address space | Minimal required server nodes + `addVariable()` |
 | Base changes | `MsgHello.decode()` + configurable `TcpMessageDecoupler` Hello callback (backward-compatible) |
+
+---
+
+## Phase 7: Subscriptions & Monitored Items ✅ COMPLETE
+
+OPC UA Part 4 §5.13 (Monitored Items) and §5.14 (Subscriptions). Targets the
+[Embedded DataChange Subscription 2022 Server Facet](../../doc/backlog/embedded-datachange-subscription-2022-server-facet/README.md).
+
+- [x] **7.1** `MonitoredItem` — `src/subscription/monitoredItem.ts`
+  - Per-item sampling state; honours `MonitoringMode.Disabled/Sampling/Reporting`
+  - Change detection via `Variant.equals()`; bounded notification queue
+
+- [x] **7.2** `Subscription` — `src/subscription/subscription.ts`
+  - Publishing timer (`setInterval(...).unref()`), keep-alive counter, lifetime counter
+  - Sequence numbers (1-based, keep-alive reuses without consuming)
+  - Up to 16 retained notifications for republish
+  - `reviseSubscriptionParameters()`: clamps to 50 ms – 1 h, ensures `lifetimeCount ≥ 3 × keepAliveCount`
+  - `enqueuePublishCallback()` / `processAcknowledgements()` / `dispose()`
+
+- [x] **7.3** `SubscriptionManager` — `src/subscription/subscriptionManager.ts`
+  - Owns all subscriptions, indexed by session
+  - `deleteSubscriptionsOfSession()` invoked on `CloseSession(deleteSubscriptions=true)`
+
+- [x] **7.4** `SubscriptionService` — `src/services/subscriptionService.ts`
+  - `CreateSubscription`, `ModifySubscription` (stub – revises params only)
+  - `DeleteSubscriptions`, `SetPublishingMode`, `Publish` (long-poll), `Republish` (stub)
+  - `Publish` always populates `notificationMessage` (encoder requires it)
+
+- [x] **7.5** `MonitoredItemService` — `src/services/monitoredItemService.ts`
+  - `CreateMonitoredItems`, `DeleteMonitoredItems`
+  - `BadSubscriptionIdInvalid` / `BadNodeIdInvalid` / `BadMonitoredItemIdInvalid`
+
+- [x] **7.6** SecureChannel concurrent dispatch
+  - `secureChannelServer.processRequests()` no longer awaits handlers; Publish long-polls run concurrently with other requests on the same channel.
+
+- [x] **7.7** Tests
+  - `tests/subscription.test.ts` — 8 unit tests
+  - `tests/integration/subscription.test.ts` — 4 integration tests (data change, keep-alive, error paths)
+  - All 71 tests pass; lint and build clean.
+
+### Open follow-ups (tracked in backlog)
+
+- Republish history (currently returns `Bad_MessageNotAvailable`).
+- ModifySubscription must re-arm the publishing timer when `publishingInterval` changes.
+- PublishRequest queue overflow handling (`Bad_TooManyPublishRequests`).
+- Per-item `samplingInterval`, `IndexRange`, `DataChangeFilter`.
+- ServerCapabilities subscription-related variables (`MaxSubscriptions`, etc.).

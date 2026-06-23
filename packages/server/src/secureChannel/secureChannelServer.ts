@@ -60,7 +60,12 @@ export class SecureChannelServer {
         if (msg.header.msgType === MsgTypeOpenFinal || msg.header.msgType === MsgTypeOpenChunk) {
           await this.handleOpenSecureChannel(msg)
         } else if (msg.header.msgType === MsgTypeFinal || msg.header.msgType === MsgTypeChunk) {
-          await this.handleServiceRequest(msg)
+          // Dispatch the service request without awaiting so long-polling
+          // services (e.g. Publish, Part 4 §5.14.5) do not block subsequent
+          // requests on the same channel.  Each response is written when the
+          // service handler resolves; the underlying WritableStream serialises
+          // concurrent writes.
+          this.startServiceRequest(msg)
         } else {
           this.logger.debug(`Ignoring message type: 0x${msg.header.msgType.toString(16)}`)
         }
@@ -148,6 +153,17 @@ export class SecureChannelServer {
     )
 
     await this.writer.write(responseMsg)
+  }
+
+  /**
+   * Fire-and-forget wrapper around {@link handleServiceRequest} so the read
+   * loop can continue processing further requests while a long-poll service
+   * (e.g. Publish) is awaiting completion.
+   */
+  private startServiceRequest(msg: ScMsgBase): void {
+    void this.handleServiceRequest(msg).catch(err => {
+      this.logger.error('Concurrent service request failed:', err)
+    })
   }
 
   constructor(

@@ -22,6 +22,7 @@ import type { ILogger } from 'opcjs-base'
 import type { ConfigurationServer } from '../configuration/configurationServer.js'
 import { SessionError } from '../sessions/sessionManager.js'
 import type { SessionManager } from '../sessions/sessionManager.js'
+import type { SubscriptionManager } from '../subscription/subscriptionManager.js'
 import { SECURITY_POLICY_NONE, TRANSPORT_PROFILE_WS } from './constants.js'
 import { makeResponseHeader } from './responseHeader.js'
 
@@ -38,6 +39,7 @@ export class SessionService {
     private readonly sessionManager: SessionManager,
     private readonly config: ConfigurationServer,
     private endpointUrl: string,
+    private readonly subscriptionManager?: SubscriptionManager,
   ) {
     this.logger = getLogger('services.SessionService')
   }
@@ -155,6 +157,9 @@ export class SessionService {
     const requestHandle = request.requestHeader?.requestHandle ?? 0
     const authToken = request.requestHeader?.authenticationToken ?? new NodeId()
 
+    if (request.deleteSubscriptions) {
+      this.subscriptionManager?.deleteSubscriptionsOfSession(authToken)
+    }
     this.sessionManager.closeSession(authToken)
 
     this.logger.debug(`Session closed (token=${authToken.toString()})`)

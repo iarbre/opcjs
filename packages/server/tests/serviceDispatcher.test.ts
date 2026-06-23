@@ -28,9 +28,12 @@ import { StubAddressSpace } from '../src/addressSpace/stubAddressSpace.js'
 import { ConfigurationServer } from '../src/configuration/configurationServer.js'
 import { AttributeService } from '../src/services/attributeService.js'
 import { DiscoveryService } from '../src/services/discoveryService.js'
+import { MonitoredItemService } from '../src/services/monitoredItemService.js'
 import { ServiceDispatcher } from '../src/services/serviceDispatcher.js'
 import { SessionService } from '../src/services/sessionService.js'
+import { SubscriptionService } from '../src/services/subscriptionService.js'
 import { SessionManager } from '../src/sessions/sessionManager.js'
+import { SubscriptionManager } from '../src/subscription/subscriptionManager.js'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,11 +42,32 @@ const ENDPOINT_URL = 'opc.wss://localhost:4840/opcua'
 function makeStack() {
   const cfg = ConfigurationServer.getSimple('TestServer', 'test')
   const sessionManager = new SessionManager(cfg)
-  const sessionSvc = new SessionService(sessionManager, cfg, ENDPOINT_URL)
-  const attributeSvc = new AttributeService(new StubAddressSpace())
+  const addressSpace = new StubAddressSpace()
+  const subscriptionManager = new SubscriptionManager(addressSpace)
+  const subscriptionSvc = new SubscriptionService(subscriptionManager)
+  const monitoredItemSvc = new MonitoredItemService(subscriptionManager)
+  const sessionSvc = new SessionService(sessionManager, cfg, ENDPOINT_URL, subscriptionManager)
+  const attributeSvc = new AttributeService(addressSpace)
   const discoverySvc = new DiscoveryService(cfg, ENDPOINT_URL)
-  const dispatcher = new ServiceDispatcher(sessionManager, sessionSvc, attributeSvc, discoverySvc)
-  return { cfg, sessionManager, sessionSvc, attributeSvc, discoverySvc, dispatcher }
+  const dispatcher = new ServiceDispatcher(
+    sessionManager,
+    sessionSvc,
+    attributeSvc,
+    discoverySvc,
+    subscriptionSvc,
+    monitoredItemSvc,
+  )
+  return {
+    cfg,
+    sessionManager,
+    sessionSvc,
+    attributeSvc,
+    discoverySvc,
+    subscriptionManager,
+    subscriptionSvc,
+    monitoredItemSvc,
+    dispatcher,
+  }
 }
 
 function makeRequestHeader(authToken?: NodeId, requestHandle = 0): RequestHeader {

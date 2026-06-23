@@ -22,14 +22,25 @@ import {
   BinaryReader,
   BinaryWriter,
   CloseSessionRequest,
+  CreateMonitoredItemsRequest,
+  CreateMonitoredItemsResponse,
   CreateSessionRequest,
   CreateSessionResponse,
+  CreateSubscriptionRequest,
+  CreateSubscriptionResponse,
   DataValue,
   Decoder,
+  DeleteSubscriptionsRequest,
+  DeleteSubscriptionsResponse,
   Encoder,
   ExtensionObject,
   LocalizedText,
+  MonitoredItemCreateRequest,
+  MonitoringModeEnum,
+  MonitoringParameters,
   NodeId,
+  PublishRequest,
+  PublishResponse,
   QualifiedName,
   ReadRequest,
   ReadResponse,
@@ -45,6 +56,7 @@ import {
   SecureChannelTypeEncoder,
   SignatureData,
   StatusCode,
+  SubscriptionAcknowledgement,
   TimestampsToReturnEnum,
   TcpConnectionHandler,
   TcpMessageDecoupler,
@@ -231,6 +243,93 @@ export class NodeClient {
 
     const resp = await this.sc!.issueServiceRequest(req) as ReadResponse
     return resp.results ?? []
+  }
+
+  /**
+   * Creates a subscription on the server and returns its assigned subscriptionId.
+   */
+  async createSubscription(opts?: {
+    requestedPublishingInterval?: number
+    requestedMaxKeepAliveCount?: number
+    requestedLifetimeCount?: number
+    maxNotificationsPerPublish?: number
+    priority?: number
+    publishingEnabled?: boolean
+  }): Promise<number> {
+    const req = new CreateSubscriptionRequest()
+    req.requestHeader = makeRequestHeader(this.authToken)
+    req.requestedPublishingInterval = opts?.requestedPublishingInterval ?? 100
+    req.requestedMaxKeepAliveCount = opts?.requestedMaxKeepAliveCount ?? 10
+    req.requestedLifetimeCount = opts?.requestedLifetimeCount ?? 30
+    req.maxNotificationsPerPublish = opts?.maxNotificationsPerPublish ?? 100
+    req.publishingEnabled = opts?.publishingEnabled ?? true
+    req.priority = opts?.priority ?? 1
+    const resp = await this.sc!.issueServiceRequest(req) as CreateSubscriptionResponse
+    if (resp.responseHeader?.serviceResult !== StatusCode.Good) {
+      throw new Error(
+        `CreateSubscription failed: 0x${resp.responseHeader?.serviceResult.toString(16)}`,
+      )
+    }
+    return resp.subscriptionId
+  }
+
+  /**
+   * Creates monitored items for the Value attribute of the given nodes.
+   */
+  async createMonitoredItems(
+    subscriptionId: number,
+    items: { nodeId: NodeId; clientHandle: number; attributeId?: number }[],
+  ): Promise<CreateMonitoredItemsResponse> {
+    const itemsToCreate = items.map(it => {
+      const rvi = new ReadValueId()
+      rvi.nodeId = it.nodeId
+      rvi.attributeId = it.attributeId ?? 13
+      rvi.indexRange = ''
+      rvi.dataEncoding = new QualifiedName(0, '')
+
+      const params = new MonitoringParameters()
+      params.clientHandle = it.clientHandle
+      params.samplingInterval = 50
+      params.filter = ExtensionObject.newEmpty()
+      params.queueSize = 1
+      params.discardOldest = true
+
+      const mic = new MonitoredItemCreateRequest()
+      mic.itemToMonitor = rvi
+      mic.monitoringMode = MonitoringModeEnum.Reporting
+      mic.requestedParameters = params
+      return mic
+    })
+
+    const req = new CreateMonitoredItemsRequest()
+    req.requestHeader = makeRequestHeader(this.authToken)
+    req.subscriptionId = subscriptionId
+    req.timestampsToReturn = TimestampsToReturnEnum.Source
+    req.itemsToCreate = itemsToCreate
+    return await this.sc!.issueServiceRequest(req) as CreateMonitoredItemsResponse
+  }
+
+  /**
+   * Sends a Publish request and returns the response.
+   */
+  async publish(acks: { subscriptionId: number; sequenceNumber: number }[] = []): Promise<PublishResponse> {
+    const req = new PublishRequest()
+    req.requestHeader = makeRequestHeader(this.authToken)
+    req.subscriptionAcknowledgements = acks.map(a => {
+      const ack = new SubscriptionAcknowledgement()
+      ack.subscriptionId = a.subscriptionId
+      ack.sequenceNumber = a.sequenceNumber
+      return ack
+    })
+    return await this.sc!.issueServiceRequest(req) as PublishResponse
+  }
+
+  /** Deletes the given subscriptions. */
+  async deleteSubscriptions(subscriptionIds: number[]): Promise<DeleteSubscriptionsResponse> {
+    const req = new DeleteSubscriptionsRequest()
+    req.requestHeader = makeRequestHeader(this.authToken)
+    req.subscriptionIds = subscriptionIds
+    return await this.sc!.issueServiceRequest(req) as DeleteSubscriptionsResponse
   }
 
   /**

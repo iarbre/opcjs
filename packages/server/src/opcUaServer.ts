@@ -7,9 +7,12 @@ import { AddressSpace } from './addressSpace/addressSpace.js'
 import { ConfigurationServer, type ServerOptions } from './configuration/configurationServer.js'
 import { AttributeService } from './services/attributeService.js'
 import { DiscoveryService } from './services/discoveryService.js'
+import { MonitoredItemService } from './services/monitoredItemService.js'
 import { ServiceDispatcher } from './services/serviceDispatcher.js'
 import { SessionService } from './services/sessionService.js'
+import { SubscriptionService } from './services/subscriptionService.js'
 import { SessionManager } from './sessions/sessionManager.js'
+import { SubscriptionManager } from './subscription/subscriptionManager.js'
 import { ConnectionHandler } from './transport/connectionHandler.js'
 import { WebSocketListener } from './transport/webSocketListener.js'
 
@@ -33,6 +36,7 @@ export class OpcUaServer {
   private running = false
   private listener?: WebSocketListener
   private sessionManager?: SessionManager
+  private subscriptionManager?: SubscriptionManager
 
   /** Address space used by the Attribute service. Replace before {@link start}. */
   public addressSpace: IAddressSpace = new AddressSpace()
@@ -75,10 +79,26 @@ export class OpcUaServer {
 
     const sessionManager = new SessionManager(this.config)
     this.sessionManager = sessionManager
-    const sessionSvc = new SessionService(sessionManager, this.config, this.config.endpointPath)
+    const subscriptionManager = new SubscriptionManager(this.addressSpace)
+    this.subscriptionManager = subscriptionManager
+    const subscriptionSvc = new SubscriptionService(subscriptionManager)
+    const monitoredItemSvc = new MonitoredItemService(subscriptionManager)
+    const sessionSvc = new SessionService(
+      sessionManager,
+      this.config,
+      this.config.endpointPath,
+      subscriptionManager,
+    )
     const attributeSvc = new AttributeService(this.addressSpace)
     const discoverySvc = new DiscoveryService(this.config, this.config.endpointPath)
-    const dispatcher = new ServiceDispatcher(sessionManager, sessionSvc, attributeSvc, discoverySvc)
+    const dispatcher = new ServiceDispatcher(
+      sessionManager,
+      sessionSvc,
+      attributeSvc,
+      discoverySvc,
+      subscriptionSvc,
+      monitoredItemSvc,
+    )
 
     this.listener = new WebSocketListener(this.config.port, this.config.endpointPath, ws => {
       // endpointUrl is evaluated lazily here — the listener is already bound so
@@ -105,6 +125,8 @@ export class OpcUaServer {
     }
     this.logger.info('Stopping OPC UA server')
 
+    this.subscriptionManager?.disposeAll()
+    this.subscriptionManager = undefined
     this.sessionManager?.closeAllSessions()
     this.sessionManager = undefined
 
