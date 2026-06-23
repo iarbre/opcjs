@@ -87,6 +87,8 @@ export class Client {
   private keepAliveTimer?: ReturnType<typeof setInterval>
   /** Set to true while a shutdown-triggered reconnect is pending to avoid duplicate attempts. */
   private shutdownReconnectPending = false
+  /** Set to true while a publish-loop-error reconnect is pending to avoid duplicate attempts. */
+  private publishLoopReconnectPending = false
   /** Most recently read NamespaceArray from the server (Session Client Renew NodeIds). */
   private namespaceTable?: NamespaceTable
 
@@ -139,12 +141,24 @@ export class Client {
     this.attributeService = new AttributeService(authToken, sc)
     this.methodService = new MethodService(authToken, sc)
     this.browseService = new BrowseService(authToken, sc)
-    this.subscriptionHandler = new SubscriptionHandler(
-      new SubscriptionService(authToken, sc),
-      new MonitoredItemService(authToken, sc),
-    )
-    // Wire the subscription-level shutdown notification into the same reconnect path.
+
+    const newSubService = new SubscriptionService(authToken, sc)
+    const newMonService = new MonitoredItemService(authToken, sc)
+
+    if (this.subscriptionHandler?.hasEntries()) {
+      // Reuse the existing handler so registered callbacks, server-assigned subscription IDs,
+      // and monitored-item handles are preserved across a channel reconnect.  Only replace
+      // the underlying service objects that are bound to the (now-dead) old channel.
+      this.subscriptionHandler.updateServices(newSubService, newMonService)
+    } else {
+      this.subscriptionHandler = new SubscriptionHandler(newSubService, newMonService)
+    }
+
+    // Wire callbacks on the handler (fresh or reused).
     this.subscriptionHandler.onShutdown = () => this.handleServerShutdownDetected()
+    // Wire the publish-error callback so a dead publish loop triggers a reconnect.
+    this.subscriptionHandler.onPublishError = () => this.handlePublishLoopError()
+
     // Refresh the NamespaceArray after every session (re-)establishment; fire-and-forget.
     void this.refreshNamespaceTable()
   }
@@ -318,6 +332,38 @@ export class Client {
           })
       }, delayMs)
     })
+  }
+
+  /**
+   * Called when the subscription publish loop terminates due to a transport or service error
+   * (e.g. `Bad_NoCommunication`).  The loop has already stopped; this method reconnects the
+   * channel, reinitialises services (preserving the existing subscription entries), and
+   * restarts the loop so notifications resume transparently.
+   *
+   * Only one reconnect attempt is scheduled at a time; duplicate firings are ignored.
+   */
+  private handlePublishLoopError(): void {
+    if (this.publishLoopReconnectPending) {
+      return
+    }
+    this.publishLoopReconnectPending = true
+    this.stopKeepAlive()
+    this.logger.warn('Publish loop error — attempting to reconnect and restart publish loop...')
+    void this.reconnectAndReactivate()
+      .then(() => {
+        this.initServices()
+        // initServices() preserves entries and updates service references.
+        // Restart the loop so notifications resume on the re-established channel.
+        this.subscriptionHandler?.restartPublishLoop()
+        this.startKeepAlive()
+        this.logger.info('Reconnected after publish loop error; publish loop restarted.')
+      })
+      .catch((err) => {
+        this.logger.warn('Reconnect after publish loop error failed:', err)
+      })
+      .finally(() => {
+        this.publishLoopReconnectPending = false
+      })
   }
 
   /**

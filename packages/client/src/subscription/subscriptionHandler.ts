@@ -37,9 +37,44 @@ export class SubscriptionHandler {
      */
     onShutdown?: () => void
 
+    /**
+     * Optional callback invoked when a Publish request fails with a transport or
+     * service-level error (e.g. `Bad_NoCommunication`).
+     *
+     * When fired the publish loop has already stopped.  The client sets this
+     * automatically in `initServices()` to trigger a reconnect and loop restart.
+     */
+    onPublishError?: () => void
+
     /** Returns true when at least one subscription is active and the publish loop is running. */
     hasActiveSubscription(): boolean {
         return this.isRunning && this.entries.length > 0
+    }
+
+    /** Returns true when there are registered subscription entries (even if the loop is not running). */
+    hasEntries(): boolean {
+        return this.entries.length > 0
+    }
+
+    /**
+     * Replaces the underlying OPC UA service instances after a channel/session reconnect.
+     * Call this when the secure channel has been re-established but the subscription
+     * entries (callbacks, node IDs, server-side IDs) should be preserved.
+     */
+    updateServices(subscriptionService: SubscriptionService, monitoredItemService: MonitoredItemService): void {
+        this.subscriptionService = subscriptionService
+        this.monitoredItemService = monitoredItemService
+    }
+
+    /**
+     * Restarts the publish loop if there are entries and the loop is not already running.
+     * Call this after `updateServices()` to resume notifications on a re-established channel
+     * where the server-side subscriptions are still alive (session reactivation path).
+     */
+    restartPublishLoop(): void {
+        if (this.isRunning || this.entries.length === 0) return
+        this.isRunning = true
+        void this.publishLoop([])
     }
 
     async subscribe(
@@ -82,6 +117,7 @@ export class SubscriptionHandler {
             this.logger.error(`Publish failed, stopping publish loop: ${err}`)
             this.isRunning = false
             this.publishInFlight = false
+            this.onPublishError?.()
             return
         }
         this.publishInFlight = false

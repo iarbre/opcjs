@@ -11,6 +11,7 @@ The client must automatically reconnect after a disconnection without requiring 
 **Client responsibilities**:
 - **SecureChannel renewal failure**: if the secure channel is no longer valid but the session is still valid, re-activate the session on a new secure channel using `ActivateSession`.
 - **Session expiry**: if the session is no longer valid, create a new session (`CreateSession` + `ActivateSession`) and restore subscriptions.
+- **Publish loop error**: when the publish loop terminates due to a transport error (e.g. `Bad_NoCommunication`), the client reconnects and restarts the loop automatically so notifications resume without requiring re-subscription.
 
 See also: [Session Client Auto Reconnect in Core 2022 Client Facet](../core-2022-client-facet/session-client-auto-reconnect.md) — same CU, same implementation.
 
